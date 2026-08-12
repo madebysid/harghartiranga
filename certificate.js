@@ -143,11 +143,23 @@ window.Certificate = (() => {
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
 
-    /* ramparts, kept low enough to stay clear of the text block */
+    /* Red Fort ramparts, kept low enough to stay clear of the text block. The
+       merlons are pointed lotus buds, matching the fort in the app — square
+       notches read as generic European castle. */
     const wallTop = H - 86;
     ctx.fillStyle = '#100a1c';
-    ctx.fillRect(0, wallTop + 22, W, 86);
-    for (let x = 0; x < W; x += 54) ctx.fillRect(x, wallTop, 31, 26);
+    ctx.fillRect(0, wallTop + 24, W, 86);
+    const pitch = 40;
+    const mw = 29;
+    for (let x = 0; x < W; x += pitch) {
+      ctx.beginPath();
+      ctx.moveTo(x, wallTop + 26);
+      ctx.lineTo(x, wallTop + 13);
+      ctx.quadraticCurveTo(x + mw / 2, wallTop - 12, x + mw, wallTop + 13);
+      ctx.lineTo(x + mw, wallTop + 26);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     /* flagpole, planted into the wall rather than stopping in mid-air */
     const poleX = 132;

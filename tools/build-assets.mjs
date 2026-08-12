@@ -126,7 +126,180 @@ const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" wid
 `;
 out('favicon.svg', favicon);
 
-/* ------------------------------------------------------- PNG encoder (og:image) */
+/* ═══════════════════════════════════════════════════ the Red Fort (Lal Qila) ══
+   Two SVGs rather than one picture, so the wall can tile to any screen width
+   while the gate stays a fixed piece parked behind the flagpole:
+
+     fort-wall.svg  a seamless curtain-wall tile, repeated across the horizon
+     fort-gate.svg  the Lahori Gate, where the flag is actually hoisted
+
+   Both are drawn in flat tonal bands rather than outlines, so they read as
+   silhouette at a glance but hold detail when you look. The distinctive part is
+   the merlons: Red Fort parapets are rows of pointed lotus-bud shapes, not the
+   square blocks that read as generic European castle.
+   ============================================================================ */
+
+const FORT = {
+  body: '#1d1128',
+  bodyLit: '#251633',   // the chhajja cornice bands catch the sky
+  recess: '#0f0817',    // arch openings and recesses
+};
+
+/** One pointed lotus-bud merlon, base-aligned at y=`base`. */
+function merlon(x, w, h, base) {
+  const shoulder = base - h * 0.45;
+  const apex = base - h * 1.06;
+  return (
+    `M${x.toFixed(1)},${base.toFixed(1)}` +
+    `L${x.toFixed(1)},${shoulder.toFixed(1)}` +
+    `Q${(x + w / 2).toFixed(1)},${apex.toFixed(1)} ${(x + w).toFixed(1)},${shoulder.toFixed(1)}` +
+    `L${(x + w).toFixed(1)},${base.toFixed(1)}Z`
+  );
+}
+
+/** A run of merlons from x0 to x1 on the given pitch. */
+function merlonRun(x0, x1, pitch, h, base, duty = 0.74) {
+  const n = Math.round((x1 - x0) / pitch);
+  const w = pitch * duty;
+  return Array.from({ length: n }, (_, i) =>
+    merlon(x0 + i * pitch + (pitch - w) / 2, w, h, base)).join('');
+}
+
+/** A pointed-arch recess: the blind arcading all over the fort's faces. */
+function archRecess(cx, w, top, base) {
+  const half = w / 2;
+  const spring = top + w * 0.42;
+  return (
+    `M${(cx - half).toFixed(1)},${base.toFixed(1)}` +
+    `L${(cx - half).toFixed(1)},${spring.toFixed(1)}` +
+    `Q${(cx - half).toFixed(1)},${top.toFixed(1)} ${cx.toFixed(1)},${(top - w * 0.16).toFixed(1)}` +
+    `Q${(cx + half).toFixed(1)},${top.toFixed(1)} ${(cx + half).toFixed(1)},${spring.toFixed(1)}` +
+    `L${(cx + half).toFixed(1)},${base.toFixed(1)}Z`
+  );
+}
+
+/** A chhatri: the domed kiosk on every Mughal roofline. */
+function chhatri(cx, base, w, h) {
+  const colH = h * 0.34;
+  const colW = w * 0.07;
+  const archTop = base - colH;
+  const entabY = archTop - h * 0.07;
+  const domeBase = entabY;
+  const apex = domeBase - h * 0.48;
+
+  const pillars = [-0.42, -0.15, 0.15, 0.42]
+    .map((f) => `<rect x="${(cx + w * f - colW / 2).toFixed(1)}" y="${archTop.toFixed(1)}" ` +
+                `width="${colW.toFixed(1)}" height="${colH.toFixed(1)}"/>`)
+    .join('');
+
+  /* A Mughal dome is taller than a hemisphere and bulges outward below its
+     widest point, so the curve leaves the base going outward before it turns
+     in. A plain arc here reads as a flat cap, not a dome. */
+  const dome =
+    `M${(cx - w * 0.34).toFixed(1)},${domeBase.toFixed(1)}` +
+    `C${(cx - w * 0.44).toFixed(1)},${(domeBase - h * 0.22).toFixed(1)} ` +
+    `${(cx - w * 0.27).toFixed(1)},${apex.toFixed(1)} ${cx.toFixed(1)},${apex.toFixed(1)}` +
+    `C${(cx + w * 0.27).toFixed(1)},${apex.toFixed(1)} ` +
+    `${(cx + w * 0.44).toFixed(1)},${(domeBase - h * 0.22).toFixed(1)} ` +
+    `${(cx + w * 0.34).toFixed(1)},${domeBase.toFixed(1)}Z`;
+
+  return (
+    `<g fill="${FORT.body}">` +
+    `<rect x="${(cx - w * 0.54).toFixed(1)}" y="${base.toFixed(1)}" width="${(w * 1.08).toFixed(1)}" height="${(h * 0.07).toFixed(1)}"/>` +
+    pillars +
+    `<rect x="${(cx - w * 0.5).toFixed(1)}" y="${entabY.toFixed(1)}" width="${w.toFixed(1)}" height="${(h * 0.075).toFixed(1)}"/>` +
+    `<path d="${dome}"/>` +
+    `<rect x="${(cx - w * 0.028).toFixed(1)}" y="${(apex - h * 0.15).toFixed(1)}" width="${(w * 0.056).toFixed(1)}" height="${(h * 0.16).toFixed(1)}"/>` +
+    `<circle cx="${cx.toFixed(1)}" cy="${(apex - h * 0.175).toFixed(1)}" r="${(w * 0.05).toFixed(1)}"/>` +
+    `</g>`
+  );
+}
+
+/* ── the tiling curtain wall ─────────────────────────────────────────────── */
+
+const WALL_W = 240;
+const WALL_H = 180;
+
+const wallSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WALL_W} ${WALL_H}" width="${WALL_W}" height="${WALL_H}" preserveAspectRatio="none">
+  <!-- wall body -->
+  <rect y="38" width="${WALL_W}" height="${WALL_H - 38}" fill="${FORT.body}"/>
+  <!-- merlons: pitch divides the tile width exactly, so the tile repeats seamlessly -->
+  <path d="${merlonRun(0, WALL_W, 24, 26, 40)}" fill="${FORT.body}"/>
+  <!-- chhajja: the projecting cornice under the parapet -->
+  <rect y="38" width="${WALL_W}" height="7" fill="${FORT.bodyLit}"/>
+  <!-- blind arcading on the wall face -->
+  <g fill="${FORT.recess}">
+    ${[40, 100, 160, 220].map((cx) => `<path d="${archRecess(cx, 30, 62, 132)}"/>`).join('\n    ')}
+  </g>
+  <!-- No plinth band here: it is drawn in CSS across the whole horizon, so it
+       stays continuous where the gate meets the wall. The two SVGs are shown at
+       different heights, so a band baked into each would never line up. -->
+</svg>
+`;
+out('fort-wall.svg', wallSvg);
+
+/* ── the Lahori Gate ─────────────────────────────────────────────────────── */
+
+const G_W = 560;
+const G_BODY = 330;
+/* Headroom above the masonry. A chhatri stands a little over its own nominal
+   height above its base once the dome and finial are counted, and without this
+   pad the tallest domes get clipped flat by the top of the viewBox. */
+const G_PAD = 60;
+const G_H = G_BODY + G_PAD;
+const GC = G_W / 2; // 280
+
+/* Bastions stand taller than the block between them, and each carries a big
+   chhatri; the central block carries three smaller ones that sit below the
+   bastion parapets, which is what gives the gate its stepped roofline. */
+const gateSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G_W} ${G_H}" width="${G_W}" height="${G_H}">
+ <g transform="translate(0 ${G_PAD})">
+  <g fill="${FORT.body}">
+    <!-- No flanking wings: the tiling curtain wall already covers the horizon at
+         that height, and a second merlon row here at a slightly different pitch
+         and height showed as slivers where the two interleaved. The bastions
+         simply rise out of the wall, which is how the real gate reads. -->
+
+    <!-- central block -->
+    <rect x="150" y="122" width="260" height="${G_BODY - 122}"/>
+    <path d="${merlonRun(152, 408, 25.6, 25, 124)}"/>
+
+    <!-- bastions, tapering very slightly inward as they rise -->
+    <path d="M44,${G_BODY} L48,82 L152,82 L152,${G_BODY} Z"/>
+    <path d="M${G_W - 44},${G_BODY} L${G_W - 48},82 L${G_W - 152},82 L${G_W - 152},${G_BODY} Z"/>
+    <path d="${merlonRun(48, 152, 26, 26, 84)}"/>
+    <path d="${merlonRun(G_W - 152, G_W - 48, 26, 26, 84)}"/>
+  </g>
+
+  <!-- chhajja cornices -->
+  <g fill="${FORT.bodyLit}">
+    <rect x="146" y="122" width="268" height="8"/>
+    <rect x="42" y="82" width="114" height="8"/>
+    <rect x="${G_W - 156}" y="82" width="114" height="8"/>
+    <rect x="150" y="196" width="260" height="6"/>
+  </g>
+
+  <!-- the great gateway, and the blind arcading around it -->
+  <g fill="${FORT.recess}">
+    <path d="${archRecess(GC, 84, 188, G_BODY)}"/>
+    ${[188, 218, 248, 312, 342, 372].map((cx) => `<path d="${archRecess(cx, 22, 148, 190)}"/>`).join('\n    ')}
+    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 26, 128, 200)}"/>`).join('\n    ')}
+    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 24, 226, 286)}"/>`).join('\n    ')}
+    ${[196, 364].map((cx) => `<path d="${archRecess(cx, 26, 226, 286)}"/>`).join('\n    ')}
+  </g>
+
+  <!-- rooflines -->
+  ${chhatri(100, 58, 50, 84)}
+  ${chhatri(G_W - 100, 58, 50, 84)}
+  ${chhatri(GC, 98, 46, 70)}
+  ${chhatri(206, 98, 34, 54)}
+  ${chhatri(354, 98, 34, 54)}
+ </g>
+</svg>
+`;
+out('fort-gate.svg', gateSvg);
+
+/* --------------------------------------------------- PNG encoder (og:image) */
 
 const CRC_TABLE = (() => {
   const t = new Int32Array(256);
@@ -187,7 +360,12 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const mixRgb = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 
 const px = new Uint8Array(OG_W * OG_H * 3);
+/* x and y must land on integers: this indexes a Uint8Array, and a fractional
+   index is silently dropped rather than rounded, which shows up as missing
+   pixels rather than as an error. */
 const put = (x, y, rgb, alpha = 1) => {
+  x = Math.round(x);
+  y = Math.round(y);
   if (x < 0 || y < 0 || x >= OG_W || y >= OG_H) return;
   const i = (y * OG_W + x) * 3;
   px[i] = lerp(px[i], rgb[0], alpha);
@@ -319,13 +497,19 @@ for (let y = POLE.top - 26; y < POLE.top + 4; y++) {
 
 // Red Fort style ramparts along the bottom.
 const RAMPART = hex('#140d1e');
-const merlon = (x) => {
-  const period = 46;
+/* Height of the merlon standing above the parapet at x — a semi-ellipse, which
+   is a close enough read of the fort's lotus-bud profile at this size. Square
+   notches here would not match the fort in the app. */
+const ogMerlonRise = (x) => {
+  const period = 34;
+  const w = 25;
   const p = ((x % period) + period) % period;
-  return p < 26 ? 0 : 17; // notch height
+  if (p >= w) return 0;
+  const t = (p / w) * 2 - 1;
+  return 21 * Math.sqrt(Math.max(0, 1 - t * t));
 };
 for (let x = 0; x < OG_W; x++) {
-  const wallTop = 566 + merlon(x) - 17;
+  const wallTop = Math.round(566 - ogMerlonRise(x));
   for (let y = wallTop; y < OG_H; y++) put(x, y, RAMPART, 0.94);
 }
 

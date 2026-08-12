@@ -168,38 +168,61 @@ body {
 }
 .stage.is-dawn .sky__haze { opacity: 1; }
 
-/* ------------------------------------------------------------ the ramparts */
+/* ------------------------------------------------------------- the Red Fort */
 
 .ground { position: absolute; inset: auto 0 0 0; height: 22%; }
 
-/* Crenellations via a repeating-linear-gradient mask: one element, no nodes. */
-.ramparts {
+/* The curtain wall is one seamlessly tiling SVG repeated across the horizon, so
+   it costs a single cached request at any screen width. */
+.wall {
   position: absolute;
   inset: auto 0 0 0;
   height: 100%;
-  background: #0c0817;
-  --merlon: repeating-linear-gradient(to right,
-    #000 0 26px, transparent 26px 46px);
-  -webkit-mask:
-    var(--merlon) top / 46px 14px repeat-x,
-    linear-gradient(#000 0 0) bottom / 100% calc(100% - 14px) no-repeat;
-  mask:
-    var(--merlon) top / 46px 14px repeat-x,
-    linear-gradient(#000 0 0) bottom / 100% calc(100% - 14px) no-repeat;
+  background: url('fort-wall.svg') repeat-x bottom center;
+  background-size: auto 100%;
 }
-.ramparts--far {
-  height: 62%;
-  bottom: 78%;
-  background: #150d20;
-  opacity: 0.75;
-  --merlon: repeating-linear-gradient(to right, #000 0 18px, transparent 18px 33px);
-  -webkit-mask:
-    var(--merlon) top / 33px 10px repeat-x,
-    linear-gradient(#000 0 0) bottom / 100% calc(100% - 10px) no-repeat;
-  mask:
-    var(--merlon) top / 33px 10px repeat-x,
-    linear-gradient(#000 0 0) bottom / 100% calc(100% - 10px) no-repeat;
+
+/* The Lahori Gate, which is where the flag is really hoisted from, so the pole
+   stands on its central block.
+
+   Sized by width, not height: the pole sits about a quarter of the way across a
+   phone screen, and a gate scaled purely off --pole-h and centred on the pole
+   ran off the left edge there. The vw cap holds it on screen, and the offset is
+   a smaller share of the flag width than .rig uses so the pole lands inside the
+   central block at every size rather than out on a bastion. */
+.gate {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: calc(-50% + var(--flag-w) * -0.3) 0;
+  width: min(calc(var(--pole-h) * 0.95), 66vw);
+  aspect-ratio: 560 / 390;
+  background: url('fort-gate.svg') no-repeat bottom center;
+  background-size: 100% 100%;
 }
+
+/* Drawn here rather than baked into either SVG: the wall and the gate are shown
+   at different heights, so a band inside each would step at the join. */
+.ground__plinth {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 15%;
+  background: #120b1b;
+}
+
+/* Sunrise reaching the stonework, so the fort warms with the sky instead of
+   staying stuck at night behind it. */
+.ground__glow {
+  position: absolute;
+  inset: -40% 0 0 0;
+  opacity: 0;
+  background: linear-gradient(to top,
+    rgb(255 146 54 / 0.34) 0%, rgb(255 120 40 / 0.12) 42%, transparent 100%);
+  transition: opacity 2800ms ease-out;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+.stage.is-dawn .ground__glow { opacity: 1; }
 
 /* ============================================================== flagpole */
 
@@ -245,23 +268,25 @@ body {
   background: #2b2f3d;
 }
 
+/* A mounting block, not a plinth: the pole stands on the gate's own rampart, so
+   anything bigger than this just blanks out the masonry behind it. */
 .pole__base {
   position: absolute;
-  left: 4px; bottom: -10px;
-  width: clamp(64px, 12vw, 104px); height: 16px;
+  left: 4px; bottom: -7px;
+  width: clamp(34px, 5vw, 52px); height: 11px;
   translate: -50% 0;
-  border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(to bottom, #2a2233, #150f1d);
-  box-shadow: 0 8px 26px rgb(0 0 0 / 0.55);
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(to bottom, #322940, #171020);
+  box-shadow: 0 5px 16px rgb(0 0 0 / 0.5);
 }
 .pole__base::after {
   content: '';
   position: absolute;
-  left: 50%; top: -5px;
-  width: 62%; height: 6px;
+  left: 50%; top: -4px;
+  width: 58%; height: 5px;
   translate: -50% 0;
-  border-radius: 3px;
-  background: linear-gradient(to bottom, #3b3145, #241c2f);
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #443954, #292036);
 }
 
 /* ------------------------------------------------------------ the carriage */
