@@ -313,14 +313,21 @@ body {
   z-index: 2;
 }
 
-.pole {
+/* The mast tapers toward the top, the way a real spar does; a uniform-width bar
+   reads as drawn rather than built.
+
+   The taper lives on a pseudo-element, not on .pole itself, because clip-path
+   clips descendants too — applied to the parent it sliced the finial, the truck
+   and the collar down to the width of the mast at their height. */
+.pole { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; }
+.pole::before {
+  content: '';
   position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 8px;
-  border-radius: 4px;
+  inset: 0;
+  clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%);
   background: linear-gradient(to right,
-    #6d7385 0%, #cfd4e0 32%, #f2f4fa 42%, #9aa0b2 62%, #4c5265 100%);
-  box-shadow: 0 0 22px rgb(0 0 0 / 0.5);
+    #6d7385 0%, #cfd4e0 30%, #f4f6fb 42%, #9aa0b2 64%, #474d60 100%);
+  filter: drop-shadow(2px 0 5px rgb(0 0 0 / 0.45));
 }
 
 .pole__finial {
@@ -333,34 +340,54 @@ body {
   box-shadow: 0 0 18px rgb(255 197 84 / 0.5);
 }
 
+/* The pulley the halyard runs over. */
 .pole__truck {
   position: absolute;
-  left: 50%; top: 14px;
-  width: 13px; height: 3px;
+  left: 50%; top: 15px;
+  width: 14px; height: 3px;
   translate: -50% 0;
   border-radius: 2px;
   background: #2b2f3d;
 }
 
-/* A mounting block, not a plinth: the pole stands on the gate's own rampart, so
-   anything bigger than this just blanks out the masonry behind it. */
-.pole__base {
+/* A brass collar where the mast enters the stonework. */
+.pole__collar {
   position: absolute;
-  left: 4px; bottom: -7px;
-  width: clamp(34px, 5vw, 52px); height: 11px;
-  translate: -50% 0;
-  border-radius: 3px 3px 1px 1px;
-  background: linear-gradient(to bottom, #322940, #171020);
-  box-shadow: 0 5px 16px rgb(0 0 0 / 0.5);
-}
-.pole__base::after {
-  content: '';
-  position: absolute;
-  left: 50%; top: -4px;
-  width: 58%; height: 5px;
+  left: 50%; bottom: 4px;
+  width: 15px; height: 7px;
   translate: -50% 0;
   border-radius: 2px;
-  background: linear-gradient(to bottom, #443954, #292036);
+  background: linear-gradient(to bottom, #e8cd8a, #a8842f 55%, #6d5418);
+}
+
+/* ------------------------------------------------------- the pole platform */
+
+/* Three courses of stone, widest at the bottom, in the fort's own tones so the
+   pole reads as set into the rampart rather than resting on a dark slab. */
+.pole__plinth {
+  position: absolute;
+  left: 4.5px; bottom: -6px;
+  translate: -50% 0;
+  display: grid;
+  justify-items: center;
+}
+.pole__step {
+  border-radius: 2px 2px 0 0;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.09);
+}
+.pole__step--top {
+  width: clamp(26px, 3.6vw, 38px); height: 7px;
+  background: linear-gradient(to bottom, #3a2a4c, #241834);
+}
+.pole__step--mid {
+  width: clamp(38px, 5.4vw, 56px); height: 6px;
+  background: linear-gradient(to bottom, #33243f, #1e1429);
+}
+.pole__step--base {
+  width: clamp(52px, 7.4vw, 76px); height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #2b1e38, #170f20);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 6px 18px rgb(0 0 0 / 0.5);
 }
 
 /* ------------------------------------------------------------ the carriage */
@@ -487,6 +514,46 @@ body {
   transition: color 160ms, border-color 160ms, background 160ms;
 }
 .sound:hover, .skip-ceremony:hover { color: var(--ink); border-color: rgb(255 255 255 / 0.3); }
+
+/* ------------------------------------------------------- the running tally */
+
+.tally {
+  position: absolute;
+  z-index: 6;
+  top: calc(14px + env(safe-area-inset-top));
+  left: calc(14px + env(safe-area-inset-left));
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.34rem 0.8rem 0.34rem 0.62rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(10 12 30 / 0.5);
+  backdrop-filter: blur(8px);
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  animation: rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.tally b { color: var(--saffron); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tally__word { color: var(--ink-faint); }
+
+.tally__dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 0 0 rgb(61 220 132 / 0.6);
+  animation: tally-pulse 2.4s ease-out infinite;
+}
+@keyframes tally-pulse {
+  0%   { box-shadow: 0 0 0 0 rgb(61 220 132 / 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgb(61 220 132 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(61 220 132 / 0); }
+}
+
+@media (max-width: 380px) {
+  .tally__word { display: none; }
+}
 
 .sound {
   top: calc(14px + env(safe-area-inset-top));

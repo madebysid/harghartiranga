@@ -142,7 +142,9 @@ out('favicon.svg', favicon);
 const FORT = {
   body: '#1d1128',
   bodyLit: '#251633',   // the chhajja cornice bands catch the sky
-  recess: '#0f0817',    // arch openings and recesses
+  bodyDim: '#170d21',   // the bastions, set back a plane from the central block
+  recess: '#090412',    // arch openings and recesses
+  stone: '#2c1d3c',     // the jharokha, which projects into the light
 };
 
 /** One pointed lotus-bud merlon, base-aligned at y=`base`. */
@@ -215,6 +217,44 @@ function chhatri(cx, base, w, h) {
   );
 }
 
+
+/**
+ * A jharokha — the projecting balcony over the gateway. Built from a canopy, a
+ * railing of balusters, and two brackets carrying it, in a lighter stone than
+ * the wall behind so it reads as standing forward of the facade.
+ */
+function jharokha(cx, base, w, h) {
+  const half = w / 2;
+  const railTop = base - h;
+  const canopyY = railTop - h * 0.34;
+
+  const balusters = Array.from({ length: 9 }, (_, i) => {
+    const x = cx - half + w * 0.09 + (w * 0.82 * i) / 8;
+    return `<rect x="${(x - w * 0.014).toFixed(1)}" y="${(railTop + h * 0.16).toFixed(1)}" ` +
+           `width="${(w * 0.028).toFixed(1)}" height="${(h * 0.62).toFixed(1)}"/>`;
+  }).join('');
+
+  return [
+    `<g fill="${FORT.stone}">`,
+    /* brackets under the floor */
+    `<path d="M${(cx - half * 0.72).toFixed(1)},${base.toFixed(1)} ` +
+      `L${(cx - half * 0.5).toFixed(1)},${(base + h * 0.42).toFixed(1)} ` +
+      `L${(cx - half * 0.28).toFixed(1)},${base.toFixed(1)} Z`,
+    `M${(cx + half * 0.28).toFixed(1)},${base.toFixed(1)} ` +
+      `L${(cx + half * 0.5).toFixed(1)},${(base + h * 0.42).toFixed(1)} ` +
+      `L${(cx + half * 0.72).toFixed(1)},${base.toFixed(1)} Z"/>`,
+    /* floor slab, railing rail and balusters */
+    `<rect x="${(cx - half).toFixed(1)}" y="${(base - h * 0.14).toFixed(1)}" width="${w.toFixed(1)}" height="${(h * 0.16).toFixed(1)}"/>`,
+    `<rect x="${(cx - half * 0.94).toFixed(1)}" y="${(railTop + h * 0.06).toFixed(1)}" width="${(w * 0.94).toFixed(1)}" height="${(h * 0.13).toFixed(1)}"/>`,
+    balusters,
+    /* canopy, on its own posts */
+    `<rect x="${(cx - half * 1.08).toFixed(1)}" y="${canopyY.toFixed(1)}" width="${(w * 1.08).toFixed(1)}" height="${(h * 0.13).toFixed(1)}"/>`,
+    `<rect x="${(cx - half * 0.9).toFixed(1)}" y="${(canopyY + h * 0.13).toFixed(1)}" width="${(w * 0.035).toFixed(1)}" height="${(h * 0.24).toFixed(1)}"/>`,
+    `<rect x="${(cx + half * 0.9 - w * 0.035).toFixed(1)}" y="${(canopyY + h * 0.13).toFixed(1)}" width="${(w * 0.035).toFixed(1)}" height="${(h * 0.24).toFixed(1)}"/>`,
+    `</g>`,
+  ].join('');
+}
+
 /* ── the tiling curtain wall ─────────────────────────────────────────────── */
 
 const WALL_W = 240;
@@ -263,30 +303,41 @@ const gateSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G_W} ${G
     <!-- central block -->
     <rect x="150" y="122" width="260" height="${G_BODY - 122}"/>
     <path d="${merlonRun(152, 408, 25.6, 25, 124)}"/>
+  </g>
 
-    <!-- bastions, tapering very slightly inward as they rise -->
+  <!-- Bastions a shade darker than the block between them: they stand a plane
+       back from the gateway face, and a single flat tone for all of it turned
+       the whole gate into one silhouetted slab. -->
+  <g fill="${FORT.bodyDim}">
     <path d="M44,${G_BODY} L48,82 L152,82 L152,${G_BODY} Z"/>
     <path d="M${G_W - 44},${G_BODY} L${G_W - 48},82 L${G_W - 152},82 L${G_W - 152},${G_BODY} Z"/>
     <path d="${merlonRun(48, 152, 26, 26, 84)}"/>
     <path d="${merlonRun(G_W - 152, G_W - 48, 26, 26, 84)}"/>
   </g>
 
-  <!-- chhajja cornices -->
+  <!-- chhajja cornices and the pilasters dividing the central block -->
   <g fill="${FORT.bodyLit}">
     <rect x="146" y="122" width="268" height="8"/>
     <rect x="42" y="82" width="114" height="8"/>
     <rect x="${G_W - 156}" y="82" width="114" height="8"/>
     <rect x="150" y="196" width="260" height="6"/>
+    <rect x="152" y="130" width="9" height="${G_BODY - 130}"/>
+    <rect x="399" y="130" width="9" height="${G_BODY - 130}"/>
+    <rect x="214" y="202" width="7" height="${G_BODY - 202}"/>
+    <rect x="339" y="202" width="7" height="${G_BODY - 202}"/>
   </g>
 
   <!-- the great gateway, and the blind arcading around it -->
   <g fill="${FORT.recess}">
-    <path d="${archRecess(GC, 84, 188, G_BODY)}"/>
-    ${[188, 218, 248, 312, 342, 372].map((cx) => `<path d="${archRecess(cx, 22, 148, 190)}"/>`).join('\n    ')}
-    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 26, 128, 200)}"/>`).join('\n    ')}
-    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 24, 226, 286)}"/>`).join('\n    ')}
-    ${[196, 364].map((cx) => `<path d="${archRecess(cx, 26, 226, 286)}"/>`).join('\n    ')}
+    <path d="${archRecess(GC, 104, 198, G_BODY)}"/>
+    ${[188, 218, 342, 372].map((cx) => `<path d="${archRecess(cx, 22, 148, 190)}"/>`).join(' ')}
+    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 26, 128, 200)}"/>`).join(' ')}
+    ${[78, 122, G_W - 122, G_W - 78].map((cx) => `<path d="${archRecess(cx, 24, 226, 286)}"/>`).join(' ')}
+    ${[178, 382].map((cx) => `<path d="${archRecess(cx, 24, 232, 300)}"/>`).join(' ')}
   </g>
+
+  <!-- the podium the flag is hoisted beside -->
+  ${jharokha(GC, 194, 128, 48)}
 
   <!-- rooflines -->
   ${chhatri(100, 58, 50, 84)}

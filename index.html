@@ -89,6 +89,7 @@
     <div class="pole" aria-hidden="true">
       <span class="pole__finial"></span>
       <span class="pole__truck"></span>
+      <span class="pole__collar"></span>
     </div>
 
     <!-- The carriage is the halyard clip: it slides up and down the pole and
@@ -106,10 +107,24 @@
       <div class="snap" id="snap" aria-hidden="true"></div>
     </div>
 
-    <div class="pole__base" aria-hidden="true"></div>
+    <!-- A stepped stone platform, the way a monument flagpole is actually set,
+         rather than a single slab. -->
+    <div class="pole__plinth" aria-hidden="true">
+      <span class="pole__step pole__step--top"></span>
+      <span class="pole__step pole__step--mid"></span>
+      <span class="pole__step pole__step--base"></span>
+    </div>
   </div>
 
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+  <!-- Top-left, mirroring the sound button, so the running total is on screen
+       throughout the ceremony rather than buried under it. -->
+  <p class="tally" id="tally" hidden>
+    <span class="tally__dot" aria-hidden="true"></span>
+    <b id="tally-num"></b>
+    <span class="tally__word">hoisted</span>
+  </p>
 
   <button class="sound" id="sound" type="button" aria-pressed="false" title="Ceremony sound">
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -150,7 +165,7 @@
     <blockquote class="quote">
       “At the stroke of the midnight hour, when the world sleeps, India will awake
       to life and freedom.”
-      <cite>Jawaharlal Nehru · 14 August 1947</cite>
+      <cite>15 August 1947</cite>
     </blockquote>
     <form class="namer" id="namer" novalidate>
       <label class="namer__label" for="name">Sign the hoisting</label>
@@ -220,11 +235,6 @@
     <div class="anthem__track" aria-hidden="true"><div class="anthem__fill" id="anthem-fill"></div></div>
     <p class="anthem__note" id="anthem-note" hidden>Please stand.</p>
   </div>
-
-  <!-- Outside the step sections on purpose: the running total is social proof at
-       every stage, and inside step 1 it vanished the moment you hoisted — right
-       when your own hoist had just pushed the number up. -->
-  <p class="counter" id="counter" hidden></p>
 
   <button class="install" id="install" type="button" hidden>
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">

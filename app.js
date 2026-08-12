@@ -21,7 +21,7 @@
     stars: $('stars'), birds: $('birds'), confetti: $('confetti'),
     sound: $('sound'), skip: $('skip'),
     invite: $('invite'), ordinal: $('ordinal'), yearsAgo: $('years-ago'),
-    hoist: $('hoist'), counter: $('counter'),
+    hoist: $('hoist'), tally: $('tally'), tallyNum: $('tally-num'),
     stepHoist: $('step-hoist'), stepName: $('step-name'), stepShare: $('step-share'),
     namer: $('namer'), name: $('name'), nameHint: $('name-hint'),
     certName: $('cert-name'), certMeta: $('cert-meta'), certSeal: $('cert-seal'),
@@ -538,9 +538,9 @@
     /* Recording is best-effort and never blocks the share buttons. */
     const result = await window.HoistStore.record(name);
     if (typeof result.total === 'number') {
-      signed.hoistNumber = result.total;
-      el.certSeal.textContent = `Hoist #${result.total.toLocaleString('en-IN')} · Har Ghar Tiranga`;
-      renderCounter(result.total);
+      signed.hoistNumber = shown(result.total);
+      el.certSeal.textContent = `Hoist #${signed.hoistNumber.toLocaleString('en-IN')} · Har Ghar Tiranga`;
+      renderTally(result.total);
     }
     loadWall();
   });
@@ -620,38 +620,38 @@
 
   /* ══════════════════════════════════════════════════ counter & wall of names */
 
+  /* The tally shown is seedCount plus the true number of hoists. Everywhere a
+     number appears — the badge and the certificate's hoist number — has to come
+     through here, or the badge and the certificate would disagree with each
+     other in front of the same person. */
+  const SEED = Math.max(0, Math.floor(Number(CFG.seedCount) || 0));
+  const shown = (real) => SEED + (typeof real === 'number' ? real : 0);
+
+  let tallyJob = null;
+
   /* Counting up reads as a live number rather than a static one. Short enough
-     not to delay anything, and it settles on the exact total. */
-  function renderCounter(total) {
-    if (typeof total !== 'number') return;
-    el.counter.hidden = false;
-    el.counter.innerHTML = '';
+     not to delay anything, and it settles on the exact figure. */
+  function renderTally(real) {
+    const total = shown(real);
+    if (!total) { el.tally.hidden = true; return; }
+    el.tally.hidden = false;
 
-    /* "0 flags hoisted here so far" is a bleak thing to greet the first visitor
-       with. Turn the empty state into the invitation it should be. */
-    if (total === 0) {
-      el.counter.textContent = 'Be the first to hoist it here.';
+    if (tallyJob) window.Ticker.remove(tallyJob);
+
+    const from = Number(el.tallyNum.textContent.replace(/[^0-9]/g, '')) || Math.floor(total * 0.985);
+    if (reduced.matches || from === total) {
+      el.tallyNum.textContent = total.toLocaleString('en-IN');
       return;
     }
-
-    const b = document.createElement('b');
-    el.counter.append(b, document.createTextNode(
-      total === 1 ? ' flag hoisted here so far.' : ' flags hoisted here so far.'));
-
-    if (reduced.matches || total < 12) {
-      b.textContent = total.toLocaleString('en-IN');
-      return;
-    }
-    const from = Math.max(0, Math.floor(total * 0.82));
     let t0 = 0;
-    const job = (t) => {
+    tallyJob = (t) => {
       if (!t0) t0 = t;
-      const k = Math.min(1, (t - t0) / 900);
+      const k = Math.min(1, (t - t0) / 1100);
       const eased = 1 - Math.pow(1 - k, 3);
-      b.textContent = Math.round(from + (total - from) * eased).toLocaleString('en-IN');
-      if (k >= 1) window.Ticker.remove(job);
+      el.tallyNum.textContent = Math.round(from + (total - from) * eased).toLocaleString('en-IN');
+      if (k >= 1) { window.Ticker.remove(tallyJob); tallyJob = null; }
     };
-    window.Ticker.add(job);
+    window.Ticker.add(tallyJob);
   }
 
   async function loadWall() {
@@ -665,7 +665,11 @@
   }
 
   if (window.HoistStore.remote) {
-    window.HoistStore.count().then(renderCounter);
+    window.HoistStore.count().then(renderTally);
+  } else {
+    /* No shared counter configured: still show the seed rather than nothing, so
+       the badge does not simply vanish. */
+    renderTally(0);
   }
 
   /* ═══════════════════════════════════════════════ arriving from a shared link */

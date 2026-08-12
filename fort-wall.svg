@@ -6,7 +6,7 @@
   <!-- chhajja: the projecting cornice under the parapet -->
   <rect y="38" width="240" height="7" fill="#251633"/>
   <!-- blind arcading on the wall face -->
-  <g fill="#0f0817">
+  <g fill="#090412">
     <path d="M25.0,132.0L25.0,74.6Q25.0,62.0 40.0,57.2Q55.0,62.0 55.0,74.6L55.0,132.0Z"/>
     <path d="M85.0,132.0L85.0,74.6Q85.0,62.0 100.0,57.2Q115.0,62.0 115.0,74.6L115.0,132.0Z"/>
     <path d="M145.0,132.0L145.0,74.6Q145.0,62.0 160.0,57.2Q175.0,62.0 175.0,74.6L175.0,132.0Z"/>
