@@ -28,6 +28,9 @@
     tweet: $('tweet'), share: $('share'), save: $('save'),
     copy: $('copy'), copyLabel: $('copy-label'),
     wall: $('wall'), restart: $('restart'), install: $('install'),
+    anthemPanel: $('anthem-panel'), anthemPlay: $('anthem-play'),
+    anthemLabel: $('anthem-label'), anthemFill: $('anthem-fill'),
+    anthemNote: $('anthem-note'),
     announce: $('announce'),
   };
 
@@ -108,6 +111,11 @@
     in: new window.ClothFlag({ canvas: el.flagIn, src: 'flags/tiranga.svg', ratio: 1.5 }),
   };
   const party = new window.Celebration(el.confetti);
+
+  /* 48s in is the closing "Jaya he" passage — the last 14 seconds of the
+     recording — which is what plays as the flag unfurls. The button plays the
+     whole thing from the top. */
+  const anthem = new window.Anthem({ src: 'anthem.mp3', hoistAt: 48 });
 
   let onPole = flags.uk;
   const drawCloth = (t) => onPole && onPole.draw(t);
@@ -218,6 +226,9 @@
     const alive = () => mine === generation && !skipped;
 
     const T = timings();
+    /* Inside the click, which is the only place mobile lets a media element be
+       primed for a later play() call. */
+    anthem.unlock();
     el.hoist.disabled = true;
     el.skip.hidden = reduced.matches;
     say('Lowering the Union Flag.');
@@ -251,6 +262,7 @@
     el.stage.classList.add('is-dawn');
     Sound.snap();
     buzz([0, 45, 55, 30]);
+    if (Sound.on) anthem.playHoist();
     if (!reduced.matches) party.burst(flagBox(), burstScale());
     await sweepUnfurl(T.unfurl);
     if (!alive()) return;
@@ -282,6 +294,7 @@
   }
 
   function settle() {
+    el.anthemPanel.hidden = false;
     el.skip.hidden = true;
     el.invite.hidden = true; // whoever invited them has served their purpose
     el.stepHoist.hidden = true;
@@ -292,6 +305,7 @@
 
   function skipCeremony() {
     skipped = true;
+    anthem.stop();
     el.stage.classList.add('is-dawn');
     onPole = flags.in;
     flags.in.reveal = 1;
@@ -307,6 +321,8 @@
     skipped = false;
     stopDrift();
     party.clear();
+    anthem.stop();
+    el.anthemPanel.hidden = true;
     el.stage.classList.remove('is-dawn');
     onPole = flags.uk;
     flags.uk.setMode(reduced.matches ? 'still' : 'flying');
@@ -408,10 +424,41 @@
     },
   };
 
-  el.sound.addEventListener('click', () => {
-    Sound.on = !Sound.on;
-    el.sound.setAttribute('aria-pressed', String(Sound.on));
-    if (Sound.on) Sound.bell(); // confirm, and unlock the context on this gesture
+  /* Default on, because the anthem playing as the flag unfurls is the point of
+     the thing — but remembered, so anyone who mutes it stays muted. */
+  const MUTE_KEY = 'tiranga.sound';
+  try { Sound.on = localStorage.getItem(MUTE_KEY) !== 'off'; } catch { Sound.on = true; }
+  el.sound.setAttribute('aria-pressed', String(Sound.on));
+
+  function setSound(on, { confirm = false } = {}) {
+    Sound.on = on;
+    el.sound.setAttribute('aria-pressed', String(on));
+    try { localStorage.setItem(MUTE_KEY, on ? 'on' : 'off'); } catch { /* private mode */ }
+    if (!on) anthem.pause();
+    else if (confirm) Sound.bell(); // also unlocks the AudioContext on this gesture
+  }
+
+  el.sound.addEventListener('click', () => setSound(!Sound.on, { confirm: true }));
+
+  /* ------------------------------------------------------- the full anthem */
+
+  el.anthemPlay.addEventListener('click', () => {
+    /* An explicit press is a request to hear it, so it un-mutes rather than
+       silently doing nothing. */
+    if (!Sound.on) setSound(true);
+    anthem.unlock();
+    anthem.toggleFull();
+  });
+
+  anthem.onChange((a) => {
+    const playing = a.playing;
+    el.anthemPlay.setAttribute('aria-pressed', String(playing));
+    el.anthemLabel.textContent = playing ? 'Playing the anthem' : 'Play the full anthem';
+    /* Only ask people to stand for the whole anthem, not for the 14-second
+       passage that plays over the hoist. */
+    el.anthemNote.hidden = !(playing && a.mode === 'full');
+    const pct = a.duration ? (a.position / a.duration) * 100 : 0;
+    el.anthemFill.style.width = `${pct.toFixed(1)}%`;
   });
 
   /* ══════════════════════════════════════════════════════════ name → share */
@@ -425,15 +472,19 @@
     .trim()
     .slice(0, 28);
 
+  /* Always ends in a slash, so appending "?by=" gives ".../?by=Name" rather than
+     the slashless ".../…web.app?by=Name". Both resolve, but only one looks like
+     a link somebody meant to send. */
   const siteBase = () => {
     const configured = (CFG.siteUrl || '').trim().replace(/\/+$/, '');
-    if (configured) return configured;
+    if (configured) return `${configured}/`;
     return location.origin + location.pathname.replace(/index\.html$/, '');
   };
 
   let signed = null; // { name, at, shareUrl, hoistNumber }
 
   function tweetHref({ name, shareUrl }) {
+    const handle = (CFG.twitterHandle || '').replace(/^@/, '').trim();
     const lines = [
       'I just hoisted the Tiranga 🇮🇳',
       '',
@@ -441,11 +492,14 @@
       '',
       `${yearsFree} years of freedom. Jai Hind!`,
       '',
+      /* Spelled out in the body rather than passed as `via`, which Twitter
+         renders as a trailing "via @handle" — that reads as who sent the tweet,
+         not who made the thing. Credit goes above the hashtags so the tweet
+         still ends on them. */
+      ...(handle ? [`Made by @${handle}`] : []),
       '#IndependenceDay #HarGharTiranga',
     ];
     const params = new URLSearchParams({ text: lines.join('\n'), url: shareUrl });
-    const via = (CFG.twitterHandle || '').replace(/^@/, '').trim();
-    if (via) params.set('via', via);
     return `https://twitter.com/intent/tweet?${params}`;
   }
 
@@ -572,6 +626,14 @@
     if (typeof total !== 'number') return;
     el.counter.hidden = false;
     el.counter.innerHTML = '';
+
+    /* "0 flags hoisted here so far" is a bleak thing to greet the first visitor
+       with. Turn the empty state into the invitation it should be. */
+    if (total === 0) {
+      el.counter.textContent = 'Be the first to hoist it here.';
+      return;
+    }
+
     const b = document.createElement('b');
     el.counter.append(b, document.createTextNode(
       total === 1 ? ' flag hoisted here so far.' : ' flags hoisted here so far.'));

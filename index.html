@@ -8,19 +8,18 @@
 <meta name="theme-color" content="#05081c">
 <meta name="color-scheme" content="dark">
 
-<!-- Social preview. If you want pixel-perfect previews everywhere, replace the two
-     og.png / twitter:image values below with the absolute URL after you deploy,
-     e.g. https://your-project.web.app/og.png -->
+<!-- Social preview. Absolute URLs: every crawler resolves those, where support
+     for relative og:image is inconsistent. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Hoist the Tiranga">
 <meta property="og:description" content="One flag comes down. Ours goes up. Hoist it yourself, sign it with your name, and share it.">
-<meta property="og:image" content="og.png">
+<meta property="og:image" content="https://harghartiranga-2026.web.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Hoist the Tiranga">
 <meta name="twitter:description" content="One flag comes down. Ours goes up. Hoist it yourself, sign it with your name, and share it.">
-<meta name="twitter:image" content="og.png">
+<meta name="twitter:image" content="https://harghartiranga-2026.web.app/og.png">
 
 <!-- Installable web app -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -143,7 +142,6 @@
       <span class="btn__label">Hoist the Tiranga</span>
       <span class="btn__shine" aria-hidden="true"></span>
     </button>
-    <p class="counter" id="counter" hidden></p>
   </section>
 
   <!-- Step 2 ────────────────────────────────────────────────────────────── -->
@@ -207,6 +205,27 @@
     <button class="restart" id="restart" type="button">Hoist again</button>
   </section>
 
+  <!-- The full anthem, offered once the flag is up. The hoist itself plays only
+       the closing passage. -->
+  <div class="anthem" id="anthem-panel" hidden>
+    <button class="anthem__play" id="anthem-play" type="button" aria-pressed="false">
+      <svg class="anthem__icon anthem__icon--play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor">
+        <path d="M8 5.5v13l11-6.5z"/>
+      </svg>
+      <svg class="anthem__icon anthem__icon--pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor">
+        <rect x="7" y="5.5" width="3.6" height="13" rx="1"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="1"/>
+      </svg>
+      <span id="anthem-label">Play the full anthem</span>
+    </button>
+    <div class="anthem__track" aria-hidden="true"><div class="anthem__fill" id="anthem-fill"></div></div>
+    <p class="anthem__note" id="anthem-note" hidden>Please stand.</p>
+  </div>
+
+  <!-- Outside the step sections on purpose: the running total is social proof at
+       every stage, and inside step 1 it vanished the moment you hoisted — right
+       when your own hoist had just pushed the number up. -->
+  <p class="counter" id="counter" hidden></p>
+
   <button class="install" id="install" type="button" hidden>
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>
@@ -227,6 +246,7 @@
 <script src="ticker.js"></script>
 <script src="cloth.js"></script>
 <script src="celebrate.js"></script>
+<script src="anthem.js"></script>
 <script src="store.js"></script>
 <script src="certificate.js"></script>
 <script src="app.js"></script>

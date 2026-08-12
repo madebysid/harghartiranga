@@ -4,8 +4,9 @@ A one-click flag hoisting for Indian Independence Day. The Union Jack comes down
 the Tiranga goes up furled, unfurls at the top and releases flower petals, the
 sky turns from pre-dawn to sunrise. Then you sign it with your name and tweet it.
 
-Installable, works offline, live in one command. No build step, no dependencies,
-no framework.
+**Live: https://harghartiranga-2026.web.app**
+
+Installable, works offline. No build step, no dependencies, no framework.
 
 ```
 index.html            markup, social preview, PWA head
@@ -13,6 +14,7 @@ styles.css            the whole visual system
 config.js             ← the only file you need to edit
 
 app.js                ceremony sequencer, share flow, install prompt
+anthem.js             Jana Gana Mana, two entry points from one file
 ticker.js             one shared requestAnimationFrame loop
 cloth.js              the waving flag, drawn per-column on a canvas
 celebrate.js          confetti, streamers and flower petals
@@ -26,6 +28,7 @@ flags/*.svg           the two flags
 fort-wall.svg         tiling Red Fort curtain wall
 fort-gate.svg         the Lahori Gate
 icons/                app icons (192, 512, maskable, apple-touch)
+anthem.mp3            the anthem, ID3 artwork stripped
 og.png                social preview card
 tools/                regenerates every image above
 ```
@@ -166,6 +169,33 @@ what drops the old cache. The strategy is split deliberately:
   of yesterday's flag costs nothing.
 - **Firestore is never touched.** A cached hoist count would be a stale number,
   and a cached write would be actively wrong.
+
+---
+
+## The anthem
+
+One file, `anthem.mp3`, played two ways:
+
+- **The hoist** plays from **0:48** — the closing *"Jaya he"* passage, the last 14
+  seconds — as the flag unfurls.
+- **The button** below the ceremony plays the whole 62 seconds from the top, and
+  asks the listener to stand, which is the expected courtesy in India.
+
+Nothing is cut into a second file. The MP3 is CBR with a Xing header, so seeking
+is accurate, and the browser range-requests from the seek point rather than
+downloading the first 48 seconds only to skip them. The recording sings
+continuously with no gap at 0:48, so the hoist fades in over 420ms — otherwise it
+starts on an abrupt mid-word attack.
+
+**Sound is on by default**, since the anthem playing as the flag rises is the
+point of the thing. The speaker button in the corner mutes everything and the
+choice is remembered, so anyone who mutes it stays muted.
+
+The source `National Anthem.mp3` is left untouched on disk but is neither
+committed nor deployed: 1.13MB of its 2.5MB was an embedded 1280×1280 cover image.
+`anthem.mp3` is the same audio stream copied without it — decoded MD5s match
+exactly — at 1.42MB. It is deliberately *not* precached by the service worker;
+pushing 1.4MB at someone who may never press play is rude. It caches on first use.
 
 ---
 

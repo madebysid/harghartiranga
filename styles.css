@@ -704,6 +704,57 @@ body {
 }
 .restart:hover { color: var(--ink-dim); }
 
+/* ---------------------------------------------------------- the full anthem */
+
+.anthem { display: grid; gap: 0.5rem; justify-items: start; }
+
+.anthem__play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1.05rem;
+  border: 1px solid rgb(255 153 51 / 0.4);
+  border-radius: 999px;
+  background: rgb(255 153 51 / 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+.anthem__play:hover { background: rgb(255 153 51 / 0.15); border-color: rgb(255 153 51 / 0.6); }
+.anthem__icon { color: var(--saffron); flex: 0 0 auto; }
+.anthem__icon--pause { display: none; }
+.anthem__play[aria-pressed='true'] .anthem__icon--play { display: none; }
+.anthem__play[aria-pressed='true'] .anthem__icon--pause { display: block; }
+
+.anthem__track {
+  width: min(100%, 17rem);
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.1);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 240ms;
+}
+.anthem__play[aria-pressed='true'] ~ .anthem__track { opacity: 1; }
+.anthem__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--saffron), #fff 60%, var(--india-green));
+}
+
+/* Standing for the anthem is the expected courtesy in India, so the app asks
+   rather than just playing it at someone. */
+.anthem__note {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--saffron);
+}
+
 /* Only ever shown when the browser actually fires beforeinstallprompt, so it
    never appears as a dead button on a platform that cannot install. */
 .install {
