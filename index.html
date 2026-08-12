@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hoist the Tiranga — Har Ghar Tiranga</title>
+<meta name="description" content="Lower the Union Jack. Raise the Tiranga. Sign the hoisting with your name and share it. A one-click flag hoisting for Indian Independence Day.">
+<meta name="theme-color" content="#0a0f2c">
+<meta name="color-scheme" content="dark">
+
+<!-- Social preview. If you want pixel-perfect previews everywhere, replace the two
+     og.png / twitter:image values below with the absolute URL after you deploy,
+     e.g. https://your-project.web.app/og.png -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Hoist the Tiranga">
+<meta property="og:description" content="One flag comes down. Ours goes up. Hoist it yourself, sign it with your name, and share it.">
+<meta property="og:image" content="og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hoist the Tiranga">
+<meta name="twitter:description" content="One flag comes down. Ours goes up. Hoist it yourself, sign it with your name, and share it.">
+<meta name="twitter:image" content="og.png">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="favicon.svg">
+
+<!-- The Union Flag is on screen immediately. The Tiranga is not needed for
+     several seconds, so it is prefetched rather than preloaded — same warm
+     cache by the time the ceremony reaches it, without the console warning. -->
+<link rel="preload" as="image" href="flags/union-jack.svg">
+<link rel="prefetch" as="image" href="flags/tiranga.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&family=Tiro+Devanagari+Hindi&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#console">Skip to the controls</a>
+
+<!-- ════════════════════════════════════════════════════════════ the scene ── -->
+<div class="stage" id="stage" data-phase="idle">
+
+  <div class="sky" aria-hidden="true">
+    <div class="sky__dawn"></div>
+    <div class="sky__stars" id="stars"></div>
+    <div class="sky__sun"></div>
+    <div class="sky__haze"></div>
+  </div>
+
+  <div class="ground" aria-hidden="true">
+    <div class="ramparts"></div>
+    <div class="ramparts ramparts--far"></div>
+  </div>
+
+  <div class="rig" id="rig">
+    <div class="pole" aria-hidden="true">
+      <span class="pole__finial"></span>
+      <span class="pole__truck"></span>
+    </div>
+
+    <!-- The carriage is the halyard clip: it slides up and down the pole and
+         whatever flag is attached rides with it. -->
+    <div class="carriage" id="carriage">
+      <div class="flag flag--uk" id="flag-uk" role="img" aria-label="Flag of the United Kingdom"></div>
+      <div class="flag flag--in" id="flag-in" role="img" aria-label="Flag of India, the Tiranga"></div>
+      <div class="bundle" id="bundle" aria-hidden="true">
+        <span class="bundle__tie"></span>
+        <span class="bundle__tie"></span>
+      </div>
+      <div class="snap" id="snap" aria-hidden="true"></div>
+    </div>
+
+    <div class="pole__base" aria-hidden="true"></div>
+  </div>
+
+  <div class="petals" id="petals" aria-hidden="true"></div>
+
+  <button class="sound" id="sound" type="button" aria-pressed="false" title="Ceremony sound">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path class="sound__horn" d="M4 9h3l4-3.5v13L7 15H4z" fill="currentColor"/>
+      <g class="sound__on" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path d="M18 7a7.4 7.4 0 0 1 0 10"/>
+      </g>
+      <path class="sound__off" d="M15.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span class="sr-only">Toggle ceremony sound</span>
+  </button>
+
+  <button class="skip-ceremony" id="skip" type="button" hidden>Skip&nbsp;→</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ the controls ── -->
+<main class="console" id="console">
+
+  <p class="invite" id="invite" hidden></p>
+
+  <!-- Step 1 ────────────────────────────────────────────────────────────── -->
+  <section class="card" id="step-hoist">
+    <p class="eyebrow">15 August · <span id="ordinal">Independence Day</span></p>
+    <h1 class="display">Hoist the <span class="nowrap">Tiranga</span></h1>
+    <p class="lede">
+      One flag came down. Ours went up. <span id="years-ago"></span>
+      later, do it again — with your own hands.
+    </p>
+    <button class="btn btn--hero" id="hoist" type="button">
+      <span class="btn__label">Hoist the Tiranga</span>
+      <span class="btn__shine" aria-hidden="true"></span>
+    </button>
+    <p class="counter" id="counter" hidden></p>
+  </section>
+
+  <!-- Step 2 ────────────────────────────────────────────────────────────── -->
+  <section class="card" id="step-name" hidden>
+    <p class="eyebrow">The Tiranga flies</p>
+    <blockquote class="quote">
+      “At the stroke of the midnight hour, when the world sleeps, India will awake
+      to life and freedom.”
+      <cite>Jawaharlal Nehru · 14 August 1947</cite>
+    </blockquote>
+    <form class="namer" id="namer" novalidate>
+      <label class="namer__label" for="name">Sign the hoisting</label>
+      <div class="namer__row">
+        <input class="input" id="name" name="name" type="text" maxlength="28"
+               autocomplete="name" placeholder="Your name" enterkeyhint="done"
+               spellcheck="false" required>
+        <button class="btn" type="submit">Sign</button>
+      </div>
+      <p class="namer__hint" id="name-hint">Your name goes on the certificate and in the tweet.</p>
+    </form>
+  </section>
+
+  <!-- Step 3 ────────────────────────────────────────────────────────────── -->
+  <section class="card" id="step-share" hidden>
+    <div class="certificate" id="certificate">
+      <div class="certificate__band" aria-hidden="true"></div>
+      <p class="certificate__kicker">Hoisted by</p>
+      <p class="certificate__name" id="cert-name"></p>
+      <p class="certificate__meta" id="cert-meta"></p>
+      <p class="certificate__seal" id="cert-seal"></p>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn--tweet" id="tweet" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor">
+          <path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.63l-5.2-6.8-5.94 6.8H1.74l7.49-8.56L1.08 2.25h6.8l4.71 6.23zm-1.16 17.52h1.83L5.83 4.13H3.86z"/>
+        </svg>
+        <span>Tweet it</span>
+      </a>
+      <button class="btn btn--ghost" id="share" type="button" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/>
+        </svg>
+        <span>Share</span>
+      </button>
+      <button class="btn btn--ghost" id="save" type="button">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v13"/><path d="M8 12l4 4 4-4"/><path d="M4 20h16"/>
+        </svg>
+        <span>Save image</span>
+      </button>
+      <button class="btn btn--ghost" id="copy" type="button">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>
+        </svg>
+        <span id="copy-label">Copy link</span>
+      </button>
+    </div>
+
+    <p class="wall" id="wall" hidden></p>
+    <button class="restart" id="restart" type="button">Hoist again</button>
+  </section>
+
+  <p class="sr-only" role="status" aria-live="polite" id="announce"></p>
+</main>
+
+<footer class="foot">
+  <span class="jaihind">जय हिन्द</span>
+  <span class="foot__dot" aria-hidden="true">·</span>
+  <span>Saffron above, always. <a href="https://www.mha.gov.in/sites/default/files/flagcodeofindia_070214.pdf" target="_blank" rel="noopener">Flag Code of India</a></span>
+</footer>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="certificate.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
