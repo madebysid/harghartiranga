@@ -3,8 +3,9 @@
 
    Phases, in order, driven by data-phase on .stage:
      idle → lower → detach → raise → unfurl → flying
-   CSS owns every visual consequence of a phase; this file only advances it and
-   moves the carriage.
+
+   CSS owns every visual consequence of a phase. This file only advances the
+   phase, moves the carriage, and tells cloth.js and celebrate.js what to do.
    ========================================================================== */
 
 (() => {
@@ -17,7 +18,7 @@
   const el = {
     stage: $('stage'), rig: $('rig'), carriage: $('carriage'),
     flagUk: $('flag-uk'), flagIn: $('flag-in'),
-    stars: $('stars'), petals: $('petals'),
+    stars: $('stars'), birds: $('birds'), confetti: $('confetti'),
     sound: $('sound'), skip: $('skip'),
     invite: $('invite'), ordinal: $('ordinal'), yearsAgo: $('years-ago'),
     hoist: $('hoist'), counter: $('counter'),
@@ -26,20 +27,20 @@
     certName: $('cert-name'), certMeta: $('cert-meta'), certSeal: $('cert-seal'),
     tweet: $('tweet'), share: $('share'), save: $('save'),
     copy: $('copy'), copyLabel: $('copy-label'),
-    wall: $('wall'), restart: $('restart'), announce: $('announce'),
+    wall: $('wall'), restart: $('restart'), install: $('install'),
+    announce: $('announce'),
   };
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* Matches .carriage { top: 18px } and the gap kept above the pole base. */
   const CARRIAGE_TOP = 18;
   const BASE_GAP = 10;
 
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
   const timings = () => (reduced.matches
-    ? { lower: 420, detach: 160, raise: 380, unfurl: 260 }
-    : { lower: 3200, detach: 620, raise: 1800, unfurl: 760 });
+    ? { lower: 420, detach: 160, raise: 380, unfurl: 300 }
+    : { lower: 3200, detach: 620, raise: 1800, unfurl: 900 });
 
   /* ══════════════════════════════════════════════════════════════ the date */
 
@@ -57,7 +58,7 @@
   el.ordinal.textContent = `${ordinalise(yearsFree + 1)} Independence Day`;
   el.yearsAgo.textContent = `${yearsFree} years`;
 
-  /* ═══════════════════════════════════════════════════════════════ the sky */
+  /* ═════════════════════════════════════════════════════ sky decoration */
 
   (function seedStars() {
     const frag = document.createDocumentFragment();
@@ -75,44 +76,77 @@
     el.stars.appendChild(frag);
   })();
 
-  /* ══════════════════════════════════════════════════════════ flag fabric */
-
-  /* Peak vertical travel of the free edge, as a fraction of flag height. Strip
-     count is what controls how smooth the wave reads: too few and the offsets
-     between neighbours show up as stair-steps along the flag edge. */
-  const WAVE_AMPLITUDE = 0.075;
-  const stripCount = () => (innerWidth < 480 ? 24 : 40);
-
-  function buildFlag(flag, flagW, flagH) {
-    const n = stripCount();
-    flag.textContent = '';
-    flag.style.setProperty('--strip-w', `${(flagW / n).toFixed(3)}px`);
-
+  (function seedBirds() {
+    if (reduced.matches) return;
     const frag = document.createDocumentFragment();
-    for (let i = 0; i < n; i++) {
-      /* The hoist edge is clamped to the pole, so amplitude has to start at
-         zero there and grow toward the free edge. */
-      const ramp = Math.pow(i / (n - 1), 1.22);
-      const strip = document.createElement('span');
-      strip.className = 'flag__strip';
-      strip.style.setProperty('--i', String(i));
-      strip.style.setProperty('--amp', `${(flagH * WAVE_AMPLITUDE * ramp).toFixed(2)}px`);
-      strip.style.setProperty('--sh', (0.16 * ramp).toFixed(3));
-      frag.appendChild(strip);
+    for (let i = 0; i < 6; i++) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'bird');
+      svg.setAttribute('viewBox', '0 0 22 10');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M1,7 Q5.5,0.8 11,6 Q16.5,0.8 21,7');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '1.5');
+      path.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(path);
+      svg.style.cssText =
+        `--y:${(8 + Math.random() * 48).toFixed(1)}%;` +
+        `--size:${(13 + Math.random() * 13).toFixed(0)}px;` +
+        `--cross:${(19 + Math.random() * 20).toFixed(0)}s;` +
+        `--flap:${(360 + Math.random() * 340).toFixed(0)}ms;` +
+        `--delay:${(Math.random() * -34).toFixed(1)}s`;
+      frag.appendChild(svg);
     }
-    flag.appendChild(frag);
+    el.birds.appendChild(frag);
+  })();
+
+  /* ═══════════════════════════════════════════════════════ cloth and canvas */
+
+  const flags = {
+    uk: new window.ClothFlag({ canvas: el.flagUk, src: 'flags/union-jack.svg', ratio: 2 }),
+    in: new window.ClothFlag({ canvas: el.flagIn, src: 'flags/tiranga.svg', ratio: 1.5 }),
+  };
+  const party = new window.Celebration(el.confetti);
+
+  let onPole = flags.uk;
+  const drawCloth = (t) => onPole && onPole.draw(t);
+
+  /* The cloth animates continuously, so its frame loop only runs while the
+     scene is actually on screen — otherwise scrolling down to the share buttons
+     leaves it burning battery on an invisible canvas. */
+  let clothRunning = false;
+  function runCloth(on) {
+    if (on === clothRunning) return;
+    clothRunning = on;
+    if (on) window.Ticker.add(drawCloth);
+    else window.Ticker.remove(drawCloth);
   }
 
-  function geometry() {
-    const flagW = el.flagUk.getBoundingClientRect().width;
-    return { flagW, ukH: flagW / 2, inH: flagW / 1.5, rigH: el.rig.clientHeight };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(
+      ([entry]) => runCloth(entry.isIntersecting),
+      { threshold: 0 },
+    ).observe(el.stage);
+  } else {
+    runCloth(true);
   }
 
   function layout() {
-    const g = geometry();
-    if (!g.flagW) return;
-    buildFlag(el.flagUk, g.flagW, g.ukH);
-    buildFlag(el.flagIn, g.flagW, g.inH);
+    const flagW = el.carriage.getBoundingClientRect().width;
+    if (!flagW) return;
+    for (const flag of Object.values(flags)) {
+      flag.resize(flagW);
+      /* The canvas is padded past the flag box on all sides; pull it back so the
+         flag's own top-left corner lands on the carriage origin. */
+      flag.canvas.style.marginTop = `${-flag.padY}px`;
+    }
+    party.resize();
+  }
+
+  function geometry() {
+    const flagW = el.carriage.getBoundingClientRect().width;
+    return { flagW, inH: flagW / 1.5, rigH: el.rig.clientHeight };
   }
 
   /* ═════════════════════════════════════════════════════════════ carriage */
@@ -140,37 +174,157 @@
   const setPhase = (p) => { el.stage.dataset.phase = p; };
   const say = (msg) => { el.announce.textContent = msg; };
 
-  /* ═══════════════════════════════════════════════════════════════ petals */
-
-  const PETAL_COLOURS = ['#f2a73b', '#e4841f', '#e8577d', '#f7c9d6', '#fff6e8', '#ffbf5e', '#3d8b4a'];
-
-  function releasePetals() {
+  const buzz = (pattern) => {
     if (reduced.matches) return;
-    const stage = el.stage.getBoundingClientRect();
-    const flag = el.flagIn.getBoundingClientRect();
-    const spread = Math.max(flag.width, 200);
-    const originX = flag.left - stage.left;
-    const originY = flag.top - stage.top;
+    try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }
+  };
 
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < 54; i++) {
-      const p = document.createElement('span');
-      const w = 5 + Math.random() * 8;
-      p.style.cssText =
-        `--x0:${(originX - spread * 0.12 + Math.random() * spread * 1.24).toFixed(1)}px;` +
-        `--y0:${(originY + Math.random() * flag.height * 0.55).toFixed(1)}px;` +
-        `--w:${w.toFixed(1)}px;` +
-        `--c:${PETAL_COLOURS[(Math.random() * PETAL_COLOURS.length) | 0]};` +
-        `--dx:${(Math.random() * 220 - 110).toFixed(0)}px;` +
-        `--dy:${(stage.height - originY + 60).toFixed(0)}px;` +
-        `--rot:${(Math.random() * 760 + 180).toFixed(0)}deg;` +
-        `--dur:${(2600 + Math.random() * 2600).toFixed(0)}ms;` +
-        `--dl:${(Math.random() * 1100).toFixed(0)}ms`;
-      frag.appendChild(p);
-    }
-    el.petals.appendChild(frag);
-    setTimeout(() => { el.petals.textContent = ''; }, 7200);
+  /** The flag's box in confetti-canvas coordinates. */
+  function flagBox() {
+    const stage = el.stage.getBoundingClientRect();
+    const c = el.carriage.getBoundingClientRect();
+    const g = geometry();
+    return { x: c.left - stage.left, y: c.top - stage.top, w: g.flagW, h: g.inH };
   }
+
+  /* ═══════════════════════════════════════════════════════ the unfurl sweep */
+
+  /* cloth.js draws only the first `reveal` share of its columns, so ramping that
+     from 0 to 1 opens the flag out from the hoist edge — a real unfurl, rather
+     than a scaled-up picture of one. */
+  function sweepUnfurl(ms) {
+    return new Promise((resolve) => {
+      const flag = flags.in;
+      if (reduced.matches) { flag.reveal = 1; resolve(); return; }
+      let t0 = 0;
+      const job = (t) => {
+        if (!t0) t0 = t;
+        const k = Math.min(1, (t - t0) / ms);
+        flag.reveal = 1 - Math.pow(1 - k, 3);
+        if (k >= 1) { window.Ticker.remove(job); resolve(); }
+      };
+      window.Ticker.add(job);
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════ the ceremony */
+
+  let generation = 0;
+  let skipped = false;
+  let driftTimer = 0;
+
+  async function ceremony() {
+    const mine = ++generation;
+    const alive = () => mine === generation && !skipped;
+
+    const T = timings();
+    el.hoist.disabled = true;
+    el.skip.hidden = reduced.matches;
+    say('Lowering the Union Flag.');
+    Sound.rope(T.lower / 1000 + 0.2);
+    buzz(18);
+
+    onPole = flags.uk;
+    flags.uk.setMode('lowering');
+    setPhase('lower');
+    glideCarriage(loweredY(), T.lower, 'cubic-bezier(0.36, 0.02, 0.5, 1)');
+    await wait(T.lower);
+    if (!alive()) return;
+
+    /* The Union Flag is unclipped and carried off; the Tiranga is tied on in
+       its place, still furled. The carriage does not move during this. */
+    setPhase('detach');
+    say('The Tiranga is tied on, furled.');
+    await wait(T.detach);
+    if (!alive()) return;
+
+    onPole = flags.in;
+    flags.in.reveal = 0;
+    flags.in.setMode('flying');
+    setPhase('raise');
+    Sound.rope(T.raise / 1000);
+    glideCarriage(0, T.raise, 'cubic-bezier(0.22, 0.66, 0.3, 1)');
+    await wait(T.raise);
+    if (!alive()) return;
+
+    setPhase('unfurl');
+    el.stage.classList.add('is-dawn');
+    Sound.snap();
+    buzz([0, 45, 55, 30]);
+    if (!reduced.matches) party.burst(flagBox(), burstScale());
+    await sweepUnfurl(T.unfurl);
+    if (!alive()) return;
+
+    Sound.bell();
+    setPhase('flying');
+    startDrift();
+    settle();
+  }
+
+  /* Thin the burst on small screens: the same particle count that looks
+     celebratory at 1440px buries a phone's flag. */
+  const burstScale = () => (innerWidth < 480 ? 0.55 : innerWidth < 900 ? 0.78 : 1);
+
+  function startDrift() {
+    if (reduced.matches || driftTimer) return;
+    driftTimer = setInterval(() => {
+      /* clothRunning tracks whether the scene is actually on screen, so
+         scrolling down to the share buttons stops spawning petals nobody is
+         looking at rather than keeping the frame loop alive for them. */
+      if (el.stage.dataset.phase !== 'flying' || document.hidden || !clothRunning) return;
+      party.drift(flagBox(), burstScale());
+    }, 1500);
+  }
+
+  function stopDrift() {
+    clearInterval(driftTimer);
+    driftTimer = 0;
+  }
+
+  function settle() {
+    el.skip.hidden = true;
+    el.invite.hidden = true; // whoever invited them has served their purpose
+    el.stepHoist.hidden = true;
+    el.stepName.hidden = false;
+    say('The Tiranga is flying. Enter your name to sign the hoisting.');
+    if (!matchMedia('(hover: none)').matches) el.name.focus({ preventScroll: true });
+  }
+
+  function skipCeremony() {
+    skipped = true;
+    el.stage.classList.add('is-dawn');
+    onPole = flags.in;
+    flags.in.reveal = 1;
+    flags.in.setMode('flying');
+    snapCarriage(0);
+    setPhase('flying');
+    startDrift();
+    settle();
+  }
+
+  function reset() {
+    generation++;
+    skipped = false;
+    stopDrift();
+    party.clear();
+    el.stage.classList.remove('is-dawn');
+    onPole = flags.uk;
+    flags.uk.setMode(reduced.matches ? 'still' : 'flying');
+    flags.in.reveal = 0;
+    setPhase('idle');
+    snapCarriage(0);
+    el.hoist.disabled = false;
+    el.skip.hidden = true;
+    el.stepShare.hidden = true;
+    el.stepName.hidden = true;
+    el.stepHoist.hidden = false;
+    el.namer.reset();
+    scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  el.hoist.addEventListener('click', ceremony);
+  el.skip.addEventListener('click', skipCeremony);
+  el.restart.addEventListener('click', reset);
 
   /* ════════════════════════════════════════════════════════════════ sound */
 
@@ -210,7 +364,7 @@
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.0001, t);
       gain.gain.linearRampToValueAtTime(0.05, t + 0.35);
-      gain.gain.setValueAtTime(0.05, t + seconds - 0.4);
+      gain.gain.setValueAtTime(0.05, t + Math.max(0.4, seconds - 0.4));
       gain.gain.linearRampToValueAtTime(0.0001, t + seconds);
       src.connect(band).connect(gain).connect(ctx.destination);
       src.start(t);
@@ -259,88 +413,6 @@
     el.sound.setAttribute('aria-pressed', String(Sound.on));
     if (Sound.on) Sound.bell(); // confirm, and unlock the context on this gesture
   });
-
-  /* ═══════════════════════════════════════════════════════════ the ceremony */
-
-  let generation = 0;
-  let skipped = false;
-
-  async function ceremony() {
-    const mine = ++generation;
-    const alive = () => mine === generation && !skipped;
-
-    const T = timings();
-    el.hoist.disabled = true;
-    el.skip.hidden = reduced.matches;
-    say('Lowering the Union Flag.');
-    Sound.rope(T.lower / 1000 + 0.2);
-
-    setPhase('lower');
-    glideCarriage(loweredY(), T.lower, 'cubic-bezier(0.36, 0.02, 0.5, 1)');
-    await wait(T.lower);
-    if (!alive()) return;
-
-    /* The Union Flag is unclipped and carried off; the Tiranga is tied on in
-       its place, still furled. The carriage does not move during this. */
-    setPhase('detach');
-    say('The Tiranga is tied on, furled.');
-    await wait(T.detach);
-    if (!alive()) return;
-
-    setPhase('raise');
-    Sound.rope(T.raise / 1000);
-    glideCarriage(0, T.raise, 'cubic-bezier(0.22, 0.66, 0.3, 1)');
-    await wait(T.raise);
-    if (!alive()) return;
-
-    setPhase('unfurl');
-    el.stage.classList.add('is-dawn');
-    Sound.snap();
-    releasePetals();
-    await wait(T.unfurl + 240);
-    if (!alive()) return;
-
-    Sound.bell();
-    setPhase('flying');
-    settle();
-  }
-
-  function settle() {
-    el.skip.hidden = true;
-    el.invite.hidden = true; // whoever invited them has served their purpose
-    el.stepHoist.hidden = true;
-    el.stepName.hidden = false;
-    say('The Tiranga is flying. Enter your name to sign the hoisting.');
-    if (!matchMedia('(hover: none)').matches) el.name.focus({ preventScroll: true });
-  }
-
-  function skipCeremony() {
-    skipped = true;
-    el.stage.classList.add('is-dawn');
-    snapCarriage(0);
-    setPhase('flying');
-    settle();
-  }
-
-  function reset() {
-    generation++;
-    skipped = false;
-    el.stage.classList.remove('is-dawn');
-    setPhase('idle');
-    snapCarriage(0);
-    el.petals.textContent = '';
-    el.hoist.disabled = false;
-    el.skip.hidden = true;
-    el.stepShare.hidden = true;
-    el.stepName.hidden = true;
-    el.stepHoist.hidden = false;
-    el.namer.reset();
-    scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  el.hoist.addEventListener('click', ceremony);
-  el.skip.addEventListener('click', skipCeremony);
-  el.restart.addEventListener('click', reset);
 
   /* ══════════════════════════════════════════════════════════ name → share */
 
@@ -405,6 +477,8 @@
     el.stepName.hidden = true;
     el.stepShare.hidden = false;
     say(`Signed by ${name}. Share it, or save the image.`);
+    buzz(25);
+    if (!reduced.matches) party.burst(flagBox(), burstScale() * 0.45);
     el.stepShare.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     /* Recording is best-effort and never blocks the share buttons. */
@@ -492,14 +566,30 @@
 
   /* ══════════════════════════════════════════════════ counter & wall of names */
 
+  /* Counting up reads as a live number rather than a static one. Short enough
+     not to delay anything, and it settles on the exact total. */
   function renderCounter(total) {
     if (typeof total !== 'number') return;
     el.counter.hidden = false;
     el.counter.innerHTML = '';
     const b = document.createElement('b');
-    b.textContent = total.toLocaleString('en-IN');
     el.counter.append(b, document.createTextNode(
       total === 1 ? ' flag hoisted here so far.' : ' flags hoisted here so far.'));
+
+    if (reduced.matches || total < 12) {
+      b.textContent = total.toLocaleString('en-IN');
+      return;
+    }
+    const from = Math.max(0, Math.floor(total * 0.82));
+    let t0 = 0;
+    const job = (t) => {
+      if (!t0) t0 = t;
+      const k = Math.min(1, (t - t0) / 900);
+      const eased = 1 - Math.pow(1 - k, 3);
+      b.textContent = Math.round(from + (total - from) * eased).toLocaleString('en-IN');
+      if (k >= 1) window.Ticker.remove(job);
+    };
+    window.Ticker.add(job);
   }
 
   async function loadWall() {
@@ -528,10 +618,41 @@
     el.invite.append(b, document.createTextNode(' hoisted the Tiranga here. Your turn.'));
   })();
 
+  /* ════════════════════════════════════════════════════════ installable app */
+
+  (function installable() {
+    let prompt = null;
+    addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault(); // keep Chrome's own mini-infobar out of the scene
+      prompt = event;
+      el.install.hidden = false;
+    });
+
+    el.install.addEventListener('click', async () => {
+      if (!prompt) return;
+      el.install.hidden = true;
+      prompt.prompt();
+      await prompt.userChoice.catch(() => {});
+      prompt = null;
+    });
+
+    addEventListener('appinstalled', () => { el.install.hidden = true; });
+
+    /* Service workers need a real origin — registering from file:// throws. */
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => { /* offline is a bonus */ });
+      });
+    }
+  })();
+
   /* ═════════════════════════════════════════════════════════════════ boot */
+
+  if (reduced.matches) flags.uk.setMode('still');
 
   layout();
   snapCarriage(0);
+  flags.in.reveal = 0;
 
   let resizeTimer;
   addEventListener('resize', () => {
@@ -544,6 +665,7 @@
     }, 180);
   });
 
-  /* Fonts landing late change the flag box width, so re-slice once they do. */
+  /* Fonts landing late can reflow the console and change the stage height, so
+     re-measure once they do. */
   document.fonts?.ready.then(layout);
 })();

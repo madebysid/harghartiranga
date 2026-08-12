@@ -514,4 +514,123 @@ for (let x = 0; x < OG_W; x++) {
 }
 
 out('og.png', encodePng(OG_W, OG_H, px));
+
+/* ══════════════════════════════════════════════════════════════ app icons ══
+   Real PNGs, because iOS ignores an SVG apple-touch-icon and Android's install
+   dialog wants raster too. Drawn here rather than exported by hand so the icon
+   can never drift out of step with the flag.
+
+   Two shapes are needed. A normal icon is shown as-drawn, so it carries its own
+   rounded corners. A maskable icon is cropped to whatever shape the launcher
+   likes — anything up to a full circle — so its artwork has to stay inside the
+   centre 80% "safe zone" while the background bleeds to all four edges.
+   ========================================================================== */
+
+function drawIcon(size, { maskable = false } = {}) {
+  const buf = new Uint8Array(size * size * 3);
+  const set = (x, y, rgb, a = 1) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= size || y >= size) return;
+    const i = (y * size + x) * 3;
+    buf[i] = lerp(buf[i], rgb[0], a);
+    buf[i + 1] = lerp(buf[i + 1], rgb[1], a);
+    buf[i + 2] = lerp(buf[i + 2], rgb[2], a);
+  };
+
+  /* Background: the night sky, warming toward the bottom like the app does. */
+  const top = hex('#0a0f2c');
+  const bot = hex('#3a2247');
+  const radius = maskable ? 0 : size * 0.22;
+  for (let y = 0; y < size; y++) {
+    const c = mixRgb(top, bot, y / (size - 1));
+    for (let x = 0; x < size; x++) {
+      /* Rounded-rect corners, antialiased, for the non-maskable icon only. */
+      let a = 1;
+      if (radius) {
+        const dx = Math.max(radius - x, x - (size - 1 - radius), 0);
+        const dy = Math.max(radius - y, y - (size - 1 - radius), 0);
+        if (dx > 0 && dy > 0) {
+          const d = Math.hypot(dx, dy);
+          if (d > radius + 0.7) continue;
+          a = Math.min(1, Math.max(0, radius + 0.5 - d));
+        }
+      }
+      set(x, y, c, a);
+    }
+  }
+
+  /* The flag, inside the safe zone. Supersampled so the chakra holds up at
+     192px, where a spoke is under two pixels wide. */
+  const safe = maskable ? 0.62 : 0.76;
+  const fw = size * safe;
+  const fh = fw / 1.5;
+  const fx = (size - fw) / 2 + size * (maskable ? 0.04 : 0.05);
+  const fy = (size - fh) / 2;
+
+  const bandH = fh / 3;
+  const chR = (bandH * 0.75) / 2;
+  const bands = [hex(SAFFRON), hex(WHITE), hex(GREEN)];
+  const navy = hex(NAVY);
+  const c = CHAKRA;
+  const wave = (p) => Math.sin(p * Math.PI * 2) * fh * 0.045 * p;
+
+  const SS = 4;
+  for (let y = Math.floor(fy - fh * 0.2); y < Math.ceil(fy + fh * 1.2); y++) {
+    for (let x = Math.floor(fx); x < Math.ceil(fx + fw); x++) {
+      let hits = 0;
+      const acc = [0, 0, 0];
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const px2 = x + (sx + 0.5) / SS;
+          const py2 = y + (sy + 0.5) / SS;
+          if (px2 < fx || px2 > fx + fw) continue;
+          const dy = wave((px2 - fx) / fw);
+          const localY = py2 - (fy + dy);
+          if (localY < 0 || localY > fh) continue;
+
+          let col = bands[Math.min(2, Math.floor(localY / bandH))];
+          const cdx = px2 - (fx + fw / 2);
+          const cdy = localY - fh / 2;
+          const d = Math.hypot(cdx, cdy);
+          if (d <= chR * 1.02) {
+            let ink = false;
+            if (Math.abs(d - c.rim * chR) <= (c.rimWidth * chR) / 2) ink = true;
+            else if (d <= c.hub * chR) ink = true;
+            else if (d >= c.spokeInner * chR && d <= c.budAt * chR) {
+              const step = (Math.PI * 2) / c.spokes;
+              const ang = Math.atan2(cdy, cdx);
+              const off = Math.abs((((ang % step) + step * 1.5) % step) - step / 2);
+              const t = (d - c.spokeInner * chR) / ((c.spokeOuter - c.spokeInner) * chR);
+              const half = lerp(c.spokeHalfInner, c.spokeHalfOuter, Math.min(1, t)) * chR;
+              if (off * d <= half) ink = true;
+            }
+            if (ink) col = navy;
+          }
+          acc[0] += col[0]; acc[1] += col[1]; acc[2] += col[2];
+          hits++;
+        }
+      }
+      if (hits) {
+        const a = hits / (SS * SS);
+        set(x, y, [acc[0] / hits, acc[1] / hits, acc[2] / hits], a);
+      }
+    }
+  }
+
+  /* Flagpole, in front of the hoist edge. */
+  const poleW = Math.max(2, size * 0.022);
+  for (let y = fy - fh * 0.16; y < fy + fh * 1.16; y++) {
+    for (let x = fx - poleW; x < fx; x++) {
+      set(x, y, mixRgb(hex('#dfe3ee'), hex('#5b6073'), (x - (fx - poleW)) / poleW));
+    }
+  }
+
+  return encodePng(size, size, buf);
+}
+
+out('icons/icon-192.png', drawIcon(192));
+out('icons/icon-512.png', drawIcon(512));
+out('icons/icon-maskable-512.png', drawIcon(512, { maskable: true }));
+out('icons/apple-touch-icon.png', drawIcon(180));
+
 console.log('\ndone.');

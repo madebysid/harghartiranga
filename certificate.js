@@ -109,15 +109,19 @@ window.Certificate = (() => {
    * @returns {Promise<HTMLCanvasElement>}
    */
   async function render(data) {
-    const serif = "Marcellus, Georgia, 'Times New Roman', serif";
-    const sans = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+    /* Marcellus has no Devanagari coverage, so Tiro follows it in the stack for
+       names written in Hindi — per-glyph fallback picks it up without affecting
+       Latin names. */
+    const serif = "Marcellus, 'Tiro Devanagari Hindi', Georgia, 'Nirmala UI', serif";
+    const sans = "Inter, system-ui, -apple-system, 'Segoe UI', 'Nirmala UI', sans-serif";
 
-    // Canvas silently substitutes a fallback for a font that has not loaded, so
-    // wait for the real ones before measuring anything.
+    /* Canvas silently substitutes a fallback for a font that has not loaded and
+       then measures the wrong widths, so wait for the real ones first. */
     if (document.fonts?.load) {
       await Promise.all([
         document.fonts.load('400 92px Marcellus').catch(() => {}),
         document.fonts.load('600 30px Inter').catch(() => {}),
+        document.fonts.load('400 92px "Tiro Devanagari Hindi"').catch(() => {}),
       ]);
     }
 

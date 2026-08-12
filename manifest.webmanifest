@@ -1,0 +1,36 @@
+{
+  "name": "Hoist the Tiranga",
+  "short_name": "Tiranga",
+  "description": "Lower the Union Jack, raise the Tiranga, sign the hoisting with your name and share it.",
+  "id": "hoist-the-tiranga",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#05081c",
+  "theme_color": "#05081c",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["entertainment", "lifestyle"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

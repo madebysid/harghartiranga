@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hoist the Tiranga — Har Ghar Tiranga</title>
 <meta name="description" content="Lower the Union Jack. Raise the Tiranga. Sign the hoisting with your name and share it. A one-click flag hoisting for Indian Independence Day.">
-<meta name="theme-color" content="#0a0f2c">
+<meta name="theme-color" content="#05081c">
 <meta name="color-scheme" content="dark">
 
 <!-- Social preview. If you want pixel-perfect previews everywhere, replace the two
@@ -22,12 +22,17 @@
 <meta name="twitter:description" content="One flag comes down. Ours goes up. Hoist it yourself, sign it with your name, and share it.">
 <meta name="twitter:image" content="og.png">
 
+<!-- Installable web app -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiranga">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<!-- iOS ignores SVG here, so this one has to be a real PNG. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
-<!-- The Union Flag is on screen immediately. The Tiranga is not needed for
-     several seconds, so it is prefetched rather than preloaded — same warm
-     cache by the time the ceremony reaches it, without the console warning. -->
 <link rel="preload" as="image" href="flags/union-jack.svg">
 <link rel="prefetch" as="image" href="flags/tiranga.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,10 +49,32 @@
 
   <div class="sky" aria-hidden="true">
     <div class="sky__dawn"></div>
+    <!-- A waning crescent. Drawn as one path of two arcs — the moon's limb down
+         the left, then a flatter ellipse back up as the terminator — because
+         overlaying a shadow circle only looks right if its fill exactly matches
+         the sky behind it, and the sky here is a moving gradient. -->
+    <svg class="sky__moon" viewBox="0 0 100 100">
+      <defs>
+        <radialGradient id="moon-face" cx="32%" cy="28%" r="82%">
+          <stop offset="0%" stop-color="#fdf8ea"/>
+          <stop offset="58%" stop-color="#e7e0c8"/>
+          <stop offset="100%" stop-color="#b5ae94"/>
+        </radialGradient>
+      </defs>
+      <!-- Both arcs travel down/up the same (left) limb, in opposite directions,
+           which is what encloses a lune: the outer one at r=47 is the moon's
+           edge, the inner one at rx=30 is the terminator. Matching sweep flags
+           instead sends the second arc round the right side and fills in a
+           near-full disc. -->
+      <path d="M50,3 A47,47 0 0 0 50,97 A30,47 0 0 1 50,3 Z" fill="url(#moon-face)"/>
+    </svg>
     <div class="sky__stars" id="stars"></div>
+    <div class="rays"></div>
     <div class="sky__sun"></div>
     <div class="sky__haze"></div>
   </div>
+
+  <div class="birds" id="birds" aria-hidden="true"></div>
 
   <!-- The Red Fort, back to front: the curtain wall along the horizon, the
        Lahori Gate parked behind the flagpole (which is where the flag is really
@@ -66,10 +93,13 @@
     </div>
 
     <!-- The carriage is the halyard clip: it slides up and down the pole and
-         whatever flag is attached rides with it. -->
+         whatever flag is attached rides with it. Its width is the flag's
+         nominal width, which is what the cloth renderer measures. -->
     <div class="carriage" id="carriage">
-      <div class="flag flag--uk" id="flag-uk" role="img" aria-label="Flag of the United Kingdom"></div>
-      <div class="flag flag--in" id="flag-in" role="img" aria-label="Flag of India, the Tiranga"></div>
+      <canvas class="flag flag--uk" id="flag-uk" role="img"
+              aria-label="Flag of the United Kingdom, flying"></canvas>
+      <canvas class="flag flag--in" id="flag-in" role="img"
+              aria-label="Flag of India, the Tiranga, flying"></canvas>
       <div class="bundle" id="bundle" aria-hidden="true">
         <span class="bundle__tie"></span>
         <span class="bundle__tie"></span>
@@ -80,7 +110,7 @@
     <div class="pole__base" aria-hidden="true"></div>
   </div>
 
-  <div class="petals" id="petals" aria-hidden="true"></div>
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
   <button class="sound" id="sound" type="button" aria-pressed="false" title="Ceremony sound">
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -173,9 +203,16 @@
       </button>
     </div>
 
-    <p class="wall" id="wall" hidden></p>
+    <p class="wall-of-names" id="wall" hidden></p>
     <button class="restart" id="restart" type="button">Hoist again</button>
   </section>
+
+  <button class="install" id="install" type="button" hidden>
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>
+    </svg>
+    <span>Add to home screen</span>
+  </button>
 
   <p class="sr-only" role="status" aria-live="polite" id="announce"></p>
 </main>
@@ -187,6 +224,9 @@
 </footer>
 
 <script src="config.js"></script>
+<script src="ticker.js"></script>
+<script src="cloth.js"></script>
+<script src="celebrate.js"></script>
 <script src="store.js"></script>
 <script src="certificate.js"></script>
 <script src="app.js"></script>
