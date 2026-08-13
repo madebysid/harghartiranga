@@ -557,6 +557,13 @@
     return location.origin + location.pathname.replace(/index\.html$/, '');
   };
 
+  /* The same test firestore.rules applies, deliberately kept in step with it.
+     The rules are what actually enforce this; this is what turns a rejected
+     write into a sentence somebody can act on rather than a silent failure.
+     Links, handles and phone numbers are what spam looks like on a public wall,
+     and no real name contains them. */
+  const SPAMMY = /(?:https?:\/\/|www\.|\.com|\.net|\.org|\.in\/|t\.me|wa\.me|@|[0-9]{3,})/i;
+
   let signed = null;         // { name, at, shareUrl } — name is null until signed
   let myHoistNumber = null;  // this visitor's place in the tally, once known
 
@@ -630,6 +637,13 @@
       el.nameHint.textContent = 'Type your name in the box first — or skip it and just share the link.';
       el.nameHint.dataset.error = '';
       el.name.focus();
+      return;
+    }
+    if (SPAMMY.test(name)) {
+      el.nameHint.textContent = 'Just a name, please — no links, handles or numbers.';
+      el.nameHint.dataset.error = '';
+      el.name.focus();
+      el.name.select();
       return;
     }
     delete el.nameHint.dataset.error;
@@ -799,7 +813,9 @@
       paintTally();
       if (signed?.name) el.certSeal.textContent = sealText();
     }
-    loadNames();
+    /* No loadNames() here on purpose. A hoist carries no name, so the wall
+       cannot have changed because of it, and re-reading it was costing every
+       visitor a third query for nothing. */
   }
 
   /* ------------------------------------------------------- the wall of names */
@@ -861,7 +877,12 @@
 
   (function greetInviter() {
     const by = cleanName(new URLSearchParams(location.search).get('by'));
-    if (!by) return;
+    /* This is text from a link, so it is whatever the sender put in the URL —
+       and it renders as a line the page appears to vouch for. It goes through the
+       same filter as a signature, so ?by=buy-crypto-at-example.com shows nothing
+       rather than an advert in the app's own voice. It is inserted with
+       textContent either way, so it can never be markup. */
+    if (!by || SPAMMY.test(by)) return;
     el.invite.hidden = false;
     el.invite.innerHTML = '';
     const b = document.createElement('b');

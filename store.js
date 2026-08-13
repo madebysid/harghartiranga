@@ -74,15 +74,21 @@ window.HoistStore = (() => {
   /** The document this browser is holding open for a name, if any. */
   let pending = null; // full resource name: projects/…/documents/hoists/ID
 
+  /**
+   * A record's fields. `signedAt` is present only once there is a name, which is
+   * what makes the wall query cheap: an orderBy on a field skips every document
+   * that does not have it, so asking for the last 12 signatures reads 12
+   * documents instead of trawling the nameless hoists in front of them.
+   */
   function fields(name) {
-    const now = new Date();
-    return {
-      fields: {
-        name: { stringValue: String(name || '').slice(0, 28) },
-        at: { timestampValue: now.toISOString() },
-        day: { stringValue: now.toISOString().slice(0, 10) },
-      },
+    const now = new Date().toISOString();
+    const out = {
+      name: { stringValue: String(name || '').slice(0, 28) },
+      at: { timestampValue: now },
+      day: { stringValue: now.slice(0, 10) },
     };
+    if (out.name.stringValue) out.signedAt = { timestampValue: now };
+    return { fields: out };
   }
 
   /* ------------------------------------------------------------------- API */
@@ -113,10 +119,11 @@ window.HoistStore = (() => {
     /**
      * The most recent names, newest first. Empty array on any failure.
      *
-     * Nameless hoists are stored too, so this over-fetches and filters here
-     * rather than asking Firestore for `name != ''` — that query needs the
-     * inequality field first in the sort, which would order the wall
-     * alphabetically instead of by time, and needs a composite index besides.
+     * Ordered by `signedAt`, which only signed records carry, so Firestore skips
+     * the nameless hoists server-side. Ordering by `at` instead meant reading 80
+     * documents to find ten names — 240 reads for one visitor across the three
+     * times this runs — which is most of a day's free quota every few hundred
+     * visitors. The small overshoot is only to survive de-duplication.
      */
     async recent(limit = 12) {
       if (!REMOTE) return [];
@@ -124,8 +131,8 @@ window.HoistStore = (() => {
         const data = await post('/:runQuery', {
           structuredQuery: {
             from: [{ collectionId: COLL }],
-            orderBy: [{ field: { fieldPath: 'at' }, direction: 'DESCENDING' }],
-            limit: Math.min(140, limit * 8),
+            orderBy: [{ field: { fieldPath: 'signedAt' }, direction: 'DESCENDING' }],
+            limit: limit + 6,
           },
         });
         const seen = new Set();
@@ -185,7 +192,8 @@ window.HoistStore = (() => {
 
       if (pending) {
         try {
-          await send('PATCH', `${ROOT}/${pending}?updateMask.fieldPaths=name`, fields(clean));
+          const mask = 'updateMask.fieldPaths=name&updateMask.fieldPaths=signedAt';
+          await send('PATCH', `${ROOT}/${pending}?${mask}`, fields(clean));
           pending = null;
           return { ok: true, total: null };
         } catch { /* fall through to writing a new record */ }

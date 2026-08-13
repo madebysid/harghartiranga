@@ -156,7 +156,40 @@ move** — the old rules reject a record without a name.
 
 **If it gets spammed.** Writes are open by design, since there is no sign-in.
 Turn on **App Check** (Firebase console → App Check → reCAPTCHA v3) to reject
-writes that do not come from your own page.
+writes that do not come from your own page. Until that is on, a script can write
+records as fast as it likes: the 2.5s throttle in `store.js` is client-side and
+therefore advisory, and only App Check can tell your page apart from `curl`.
+
+`firestore.rules` does the rest of the work, and it is worth knowing what each
+part is defending:
+
+- **`nameShaped`** rejects links, `@handles` and 3-or-more-digit runs, which is
+  what spam on a public wall actually looks like. `app.js` applies the same test
+  before writing so a rejected name produces a sentence rather than silence. It
+  cannot judge whether a name is offensive — nothing here can. That is why the
+  wall shows first names only, and why being able to delete matters.
+- **`sane`** bounds both timestamps: generous in the past, because cheap handsets
+  have wrong clocks, and tight in the future, because the wall is ordered by
+  `signedAt` and an unbounded one would let somebody date a record to 2099 and
+  pin their name to the top of it forever.
+- **The 30-minute update window** stops a passer-by putting a name on somebody
+  else's unsigned hoist long after the fact.
+- **Deletes are refused outright**, so nothing on the wall can be erased from a
+  browser. Moderate with the CLI:
+  `firebase firestore:delete "hoists/<id>" --force --project <id>`.
+
+**Security headers** are set for every path in `firebase.json`. The one that
+earns its keep is `script-src 'self'`: every script the app runs is a file in
+this repo and none are inline, so an injected `<script>` cannot execute even if
+something did get a string into the page. `connect-src` is limited to Firestore,
+so nothing can quietly post data elsewhere. `style-src` keeps `'unsafe-inline'`
+because the scene is animated by setting style attributes — which is not the risk
+`script-src` is there to close.
+
+**None of the client code is secret, and it cannot be.** Every file is
+downloaded by every visitor; the API key in `config.js` is public by design.
+What protects the app is `firestore.rules` and App Check, both of which run on
+Google's servers where a visitor cannot reach them.
 
 ---
 
