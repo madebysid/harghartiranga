@@ -12,6 +12,21 @@ window.TIRANGA_CONFIG = {
   /* Credited in the tweet as "Made by @handle". Without the @. */
   twitterHandle: 'sidtweeted',
 
+  /* Where to read the hoist count and the wall of names from. Blank means
+     wall.json next to index.html, which is right for any single-host setup.
+
+     Point it elsewhere when the app is served from a host that charges for
+     rebuilds. Cloudflare Pages allows 500 builds a month and rebuilds on every
+     push, so the ten-minute refresh commit — about 4,300 a month — would use the
+     allowance up in four days. Serving the app from Cloudflare while this one
+     small file comes from GitHub Pages costs nothing on either side: Pages
+     rebuilds are effectively unlimited, and the file is under 100 bytes.
+
+     Cross-origin, so the host has to be named in connect-src in both _headers
+     and firebase.json. If the fetch fails for any reason the app falls back to
+     querying Firestore directly, which is correct but costs reads. */
+  wallUrl: '',
+
   /* Added to the hoist count everywhere it is shown, so the tally does not open
      at zero. Real hoists are counted honestly on top of it, and this number
      never changes — set it once and leave it, or the total will appear to jump

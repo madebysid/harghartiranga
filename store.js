@@ -113,7 +113,8 @@ window.HoistStore = (() => {
      */
     async snapshot() {
       try {
-        const res = await fetch('wall.json', { signal: AbortSignal.timeout(5000) });
+        const url = (window.TIRANGA_CONFIG?.wallUrl || '').trim() || 'wall.json';
+        const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) return null;
         const data = await res.json();
         if (typeof data?.count !== 'number') return null;
