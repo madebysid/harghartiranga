@@ -7,7 +7,10 @@ window.TIRANGA_CONFIG = {
   /* Live URL, used in the tweet and the share sheet. Set explicitly rather than
      left blank so a link shared from a Firebase preview channel, or from
      localhost, still points people at production. */
-  siteUrl: 'https://harghartiranga-2026.web.app',
+  /* Cloudflare Pages, because its free bandwidth is unmetered. Firebase Hosting
+     serves the same build as a mirror, but its free tier is 360MB a day — about
+     1,660 hoists — so the address people are sent has to be this one. */
+  siteUrl: 'https://harghartiranga.pages.dev',
 
   /* Credited in the tweet as "Made by @handle". Without the @. */
   twitterHandle: 'sidtweeted',
@@ -25,7 +28,7 @@ window.TIRANGA_CONFIG = {
      Cross-origin, so the host has to be named in connect-src in both _headers
      and firebase.json. If the fetch fails for any reason the app falls back to
      querying Firestore directly, which is correct but costs reads. */
-  wallUrl: '',
+  wallUrl: 'https://madebysid.github.io/harghartiranga/wall.json',
 
   /* Added to the hoist count everywhere it is shown, so the tally does not open
      at zero. Real hoists are counted honestly on top of it, and this number
