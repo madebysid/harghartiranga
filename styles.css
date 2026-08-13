@@ -501,83 +501,6 @@ body {
   pointer-events: none;
 }
 
-/* ================================================ the names, drifting upward */
-
-/* Down the right-hand side of the sky, well clear of the flag on the left and
-   of the sound button above. It is scenery, not a feed: slow, dim, and it never
-   moves anything else on the page. */
-.roll {
-  --roll-h: min(30svh, 260px);
-  position: absolute;
-  z-index: 3;
-  top: calc(64px + env(safe-area-inset-top));
-  right: calc(12px + env(safe-area-inset-right));
-  width: min(30vw, 9rem);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  text-align: right;
-  pointer-events: none;
-}
-
-.roll__label {
-  margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(255 255 255 / 0.3);
-}
-
-/* Fixed height, because the rise animation travels exactly one column height and
-   a percentage translate would resolve against each name's own line box. */
-.roll__track {
-  position: relative;
-  height: var(--roll-h);
-  overflow: hidden;
-  -webkit-mask: linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
-  mask: linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
-}
-
-.roll__name {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--serif);
-  font-size: 0.86rem;
-  color: #ffe6c8;
-  text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
-  opacity: 0;
-  animation: roll-rise var(--roll-ms, 19s) linear infinite;
-  will-change: transform;
-}
-
-/* Transform only — ten of these run for as long as the page is open, alongside
-   the cloth simulation, so none of it may touch layout. */
-@keyframes roll-rise {
-  0%   { transform: translateY(0); opacity: 0; }
-  14%  { opacity: 0.62; }
-  84%  { opacity: 0.62; }
-  100% { transform: translateY(calc(var(--roll-h) * -1)); opacity: 0; }
-}
-
-/* On a phone the flag fills the width the names were using, so they move down
-   into the empty sky between the flag's lower edge and the ramparts. Anchored to
-   the bottom of the stage rather than the top, because that is the edge the free
-   space is measured from. */
-@media (max-width: 560px) {
-  .roll {
-    top: auto;
-    bottom: 15%;
-    width: 7.4rem;
-    --roll-h: min(20svh, 140px);
-  }
-  .roll__name { font-size: 0.78rem; }
-}
-
 /* =============================================== scene chrome (sound/skip) */
 
 .sound, .skip-ceremony {
@@ -1002,11 +925,6 @@ body {
 .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .actions .btn { padding: 0.7rem 1.1rem; font-size: 0.94rem; }
 
-/* The same names that drift up the sky, as plain text. Named .names, not .wall:
-   the fort's curtain wall up in the scene is .wall, and a second .wall rule down
-   here was quietly setting a margin and a font size on the stonework. */
-.names { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--ink-faint); line-height: 1.7; }
-.names b { color: var(--ink-dim); font-weight: 500; }
 
 .restart {
   justify-self: start;
@@ -1180,16 +1098,4 @@ body {
      walkthrough — and loses the pulse and the bob. */
   .coach__ring { animation: none; box-shadow: 0 0 0 4px rgb(255 153 51 / 0.18); }
   .coach__bubble.is-in { animation: none; }
-
-  /* The names stop drifting and simply stack, newest at the bottom. Without
-     the animation every name would otherwise pile up on the same baseline. */
-  .roll__track {
-    height: auto;
-    display: grid;
-    gap: 0.2rem;
-    -webkit-mask: none;
-    mask: none;
-  }
-  .roll__name { position: static; animation: none; opacity: 0.55; }
-  .roll__name:nth-child(n+5) { display: none; }
 }

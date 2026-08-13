@@ -2,74 +2,54 @@ rules_version = '2';
 
 // Deploy with:  firebase deploy --only firestore:rules
 //
-// Anyone may read the wall of names and write hoist records. There is no
-// sign-in, so this file is the only thing standing between the app and the open
-// internet — it has to assume every field is hostile.
+// This database holds one thing: how many times the flag has been hoisted. One
+// record per hoist, carrying nothing but when it happened.
 //
-// A record is written the moment the flag is hoisted, with an empty name: that
-// is what makes the counter count everybody who hoists rather than only the few
-// who sign. Signing afterwards fills the name in, so the one update allowed here
-// is an empty name becoming a real one, once, soon after the hoist. Nothing else
-// can ever be edited, and nothing can be deleted.
+// Names are deliberately not here. People type a name to put on their own
+// certificate and into their own share message, and that name never leaves their
+// browser. Storing it would have meant a public wall of user-supplied text, and
+// no rule can judge whether a name is offensive — so the wall is gone and with it
+// the only risk that could not be defended against. It also halves the writes.
 //
-// What this cannot do is stop a determined person typing something vile into a
-// public text box. See the moderation notes in the README: keep App Check on,
-// and delete what needs deleting.
+// There is no sign-in, so this file is the only thing standing between the
+// collection and the open internet. It has to assume every field is hostile.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Client clocks are wrong more often than you would think — a cheap handset
-    // can be hours out — so this is generous in the past and tight in the
-    // future. Tight in the future is the point: the wall is ordered by these
-    // timestamps, and without a ceiling somebody could date a record to 2099 and
-    // pin their name to the top of it permanently.
+    // can be hours out — so this is generous in the past and tight in the future.
+    // A ceiling matters because records are ordered by time: without one, a
+    // record dated 2099 would sit at the head of the collection forever.
     function sane(ts) {
       return ts is timestamp
         && ts > request.time - duration.value(48, 'h')
         && ts < request.time + duration.value(2, 'h');
     }
 
-    // Not an attempt at judging names — it cannot be — but it does keep the wall
-    // from becoming an advertising board. Links, handles and phone numbers are
-    // what spam actually looks like, and no real name contains them. RE2 anchors
-    // the whole string, hence the wrapping .*
-    function nameShaped(n) {
-      return n is string
-        && n.size() <= 28
-        && !n.matches('(?i).*(https?://|www\\.|\\.com|\\.net|\\.org|\\.in/|t\\.me|wa\\.me|@|[0-9]{3,}).*');
-    }
-
     match /hoists/{hoist} {
+      // Public: the count is read from here once every ten minutes by CI, which
+      // publishes it as a static file. Browsers never read this collection.
       allow read: if true;
 
-      // The hoist itself. Nameless unless and until somebody signs it, and a
-      // signed-in-one-go record (the fallback when the patch cannot be made)
-      // has to carry its signing time too.
+      // One hoist, and nothing about who made it.
+      //
+      // `name` is tolerated only while empty, so a browser still running the
+      // previous build cannot write one and cannot be broken by this rule. It is
+      // not written by the current app at all.
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'at', 'day'])
-        && request.resource.data.keys().hasOnly(['name', 'at', 'day', 'signedAt'])
-        && nameShaped(request.resource.data.name)
+        request.resource.data.keys().hasAll(['at', 'day'])
+        && request.resource.data.keys().hasOnly(['at', 'day', 'name'])
         && sane(request.resource.data.at)
         && request.resource.data.day is string
         && request.resource.data.day.size() == 10
-        && (request.resource.data.name == ''
-              ? !('signedAt' in request.resource.data)
-              : sane(request.resource.data.signedAt));
+        && (!('name' in request.resource.data) || request.resource.data.name == '');
 
-      // Signing a hoist: the name and its timestamp, nothing else, only while
-      // the name is still empty, and only within half an hour of the hoist —
-      // otherwise any passer-by could come back later and put a name on a
-      // stranger's unsigned record.
-      allow update: if
-        resource.data.name == ''
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'signedAt'])
-        && request.resource.data.name.size() > 0
-        && nameShaped(request.resource.data.name)
-        && sane(request.resource.data.signedAt)
-        && request.time < resource.data.at + duration.value(30, 'm');
-
-      allow delete: if false;
+      // A hoist is a fact about a moment. Nothing can revise it afterwards, and
+      // nothing can erase it. The previous build allowed one update — an empty
+      // name becoming a real one — which is what signing used to do; with names
+      // out of the database that permission has no purpose and is withdrawn.
+      allow update, delete: if false;
     }
 
     // Nothing else in the database is reachable from the browser.

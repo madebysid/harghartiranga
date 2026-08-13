@@ -118,14 +118,10 @@
 
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
-  <!-- Everyone who has signed a hoist, drifting up the right-hand side of the
-       sky. aria-hidden because it is a moving decoration: the same names are
-       listed as plain text down in the share card, which is what a screen
-       reader should get. -->
-  <div class="roll" id="roll" aria-hidden="true" hidden>
-    <p class="roll__label">Hoisted by</p>
-    <div class="roll__track" id="roll-track"></div>
-  </div>
+  <!-- There was a column of signed names drifting up the sky here. It is gone on
+       purpose: a name typed into this app now stays in the browser that typed it,
+       so there is no public wall of user-supplied text to moderate. The running
+       total in the corner is what remains shared. -->
 
   <!-- Top-left, mirroring the sound button, so the running total is on screen
        throughout the ceremony rather than buried under it. -->
@@ -196,7 +192,7 @@
                spellcheck="false" required>
         <button class="btn" type="submit">Sign</button>
       </div>
-      <p class="namer__hint" id="name-hint">Type your name and press Sign — it goes on your certificate and joins the names drifting up the sky.</p>
+      <p class="namer__hint" id="name-hint">Type your name and press Sign — it goes on your certificate and your share message. It stays on your device; we never send it anywhere.</p>
     </form>
   </section>
 
@@ -248,7 +244,6 @@
       </button>
     </div>
 
-    <p class="names" id="wall" hidden></p>
     <button class="restart" id="restart" type="button">Hoist again</button>
   </section>
 

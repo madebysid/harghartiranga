@@ -1,23 +1,25 @@
 /* ============================================================================
-   HoistStore — the shared hoist counter and wall of names.
+   HoistStore — the shared hoist counter.
+
+   Two operations, and neither of them involves a name:
+
+     snapshot()   read the count, from a static file published by CI. This is
+                  what every visitor does, and it costs no Firestore reads.
+     hoist()      record one hoist, the moment the button is pressed.
+
+   Names never come here. Somebody types a name to put on their own certificate
+   and into their own share message, and it stays in their browser. Storing it
+   would have meant a public wall of user-supplied text on the site, which is the
+   one risk no security rule can defend against — a rule can refuse a link or a
+   phone number, but not an offensive name. Dropping it also halves the writes.
 
    Talks to the Firestore REST API with plain fetch. That is deliberate: the
-   Firebase JS SDK is ~300KB for what amounts to four HTTP calls, and pulling it
+   Firebase JS SDK is ~300KB for what amounts to two HTTP calls, and pulling it
    in would force a bundler onto a project that otherwise has no build step.
 
-   A hoist is recorded in two moves, because those are two different moments:
-
-     hoist()      the button was pressed — write the record now, nameless.
-     sign(name)   a name was typed afterwards — patch it onto that same record.
-
-   Counting at the press is the whole point: most people never type a name, and
-   a counter that only counts signatures undercounts the thing it claims to
-   measure. Patching rather than writing a second document is what keeps one
-   person from counting twice.
-
    If config.js has no projectId, every method still resolves — the counter just
-   falls back to this browser's own localStorage tally and the wall stays empty.
-   Nothing here ever throws into the ceremony.
+   falls back to this browser's own localStorage tally. Nothing here ever throws
+   into the ceremony.
    ========================================================================== */
 
 window.HoistStore = (() => {
@@ -27,8 +29,7 @@ window.HoistStore = (() => {
   const COLL = (CFG.collection || 'hoists').trim();
   const REMOTE = Boolean(PROJECT && KEY);
 
-  const ROOT = 'https://firestore.googleapis.com/v1';
-  const BASE = `${ROOT}/projects/${PROJECT}/databases/(default)/documents`;
+  const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
   const LS_LOCAL_COUNT = 'tiranga.localHoists';
   const LS_LAST_WRITE = 'tiranga.lastWrite';
 
@@ -48,12 +49,12 @@ window.HoistStore = (() => {
     set(k, v) { try { localStorage.setItem(k, String(v)); } catch { /* private mode */ } },
   };
 
-  async function send(method, url, body, timeoutMs = 6000) {
+  async function post(path, body, timeoutMs = 6000) {
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), timeoutMs);
     try {
-      const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}key=${KEY}`, {
-        method,
+      const res = await fetch(`${BASE}${path}?key=${KEY}`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: abort.signal,
@@ -65,31 +66,9 @@ window.HoistStore = (() => {
     }
   }
 
-  const post = (path, body, timeoutMs) => send('POST', `${BASE}${path}`, body, timeoutMs);
-
   const localCount = () => Number(ls.get(LS_LOCAL_COUNT, '0')) || 0;
 
   const cooling = () => Date.now() - (Number(ls.get(LS_LAST_WRITE, '0')) || 0) < WRITE_COOLDOWN_MS;
-
-  /** The document this browser is holding open for a name, if any. */
-  let pending = null; // full resource name: projects/…/documents/hoists/ID
-
-  /**
-   * A record's fields. `signedAt` is present only once there is a name, which is
-   * what makes the wall query cheap: an orderBy on a field skips every document
-   * that does not have it, so asking for the last 12 signatures reads 12
-   * documents instead of trawling the nameless hoists in front of them.
-   */
-  function fields(name) {
-    const now = new Date().toISOString();
-    const out = {
-      name: { stringValue: String(name || '').slice(0, 28) },
-      at: { timestampValue: now },
-      day: { stringValue: now.slice(0, 10) },
-    };
-    if (out.name.stringValue) out.signedAt = { timestampValue: now };
-    return { fields: out };
-  }
 
   /* ------------------------------------------------------------------- API */
 
@@ -100,8 +79,8 @@ window.HoistStore = (() => {
     remote: REMOTE,
 
     /**
-     * The count and the wall as of the last CI snapshot — one static file from
-     * the CDN, and no Firestore reads at all.
+     * The count as of the last CI snapshot — one static file from the CDN, and
+     * no Firestore reads at all.
      *
      * This is the normal path. Reading Firestore from every browser cost about
      * 34 reads a visitor, and far more as the collection grew, because a count()
@@ -109,7 +88,7 @@ window.HoistStore = (() => {
      * thousand records it was 232 a visitor and the free daily allowance was
      * gone after two hundred people. A snapshot costs one cached GET.
      *
-     * @returns {Promise<{count:number, names:string[], at:string}|null>}
+     * @returns {Promise<{count:number, at:string}|null>}
      */
     async snapshot() {
       try {
@@ -118,17 +97,16 @@ window.HoistStore = (() => {
         if (!res.ok) return null;
         const data = await res.json();
         if (typeof data?.count !== 'number') return null;
-        return {
-          count: data.count,
-          names: Array.isArray(data.names) ? data.names.filter((n) => typeof n === 'string' && n.trim()) : [],
-          at: typeof data.at === 'string' ? data.at : '',
-        };
+        return { count: data.count, at: typeof data.at === 'string' ? data.at : '' };
       } catch {
         return null;
       }
     },
 
-    /** Total hoists ever, or null if it cannot be determined. */
+    /**
+     * Total hoists ever, straight from Firestore. Only used when the snapshot is
+     * unreachable, and by the CI job that writes the snapshot.
+     */
     async count() {
       if (!REMOTE) return null;
       try {
@@ -146,102 +124,33 @@ window.HoistStore = (() => {
     },
 
     /**
-     * The most recent names, newest first. Empty array on any failure.
+     * Record one hoist, the moment the button is pressed — not when a name is
+     * typed. Most people never type one, and they hoisted the flag all the same.
      *
-     * Ordered by `signedAt`, which only signed records carry, so Firestore skips
-     * the nameless hoists server-side. Ordering by `at` instead meant reading 80
-     * documents to find ten names — 240 reads for one visitor across the three
-     * times this runs — which is most of a day's free quota every few hundred
-     * visitors. The small overshoot is only to survive de-duplication.
-     */
-    async recent(limit = 12) {
-      if (!REMOTE) return [];
-      try {
-        const data = await post('/:runQuery', {
-          structuredQuery: {
-            from: [{ collectionId: COLL }],
-            orderBy: [{ field: { fieldPath: 'signedAt' }, direction: 'DESCENDING' }],
-            limit: limit + 6,
-          },
-        });
-        const seen = new Set();
-        const names = [];
-        for (const row of Array.isArray(data) ? data : []) {
-          const name = row?.document?.fields?.name?.stringValue;
-          if (typeof name !== 'string' || !name.trim()) continue;
-          const key = name.toLocaleLowerCase();
-          if (seen.has(key)) continue; // one line per person, not per hoist
-          seen.add(key);
-          names.push(name);
-          if (names.length >= limit) break;
-        }
-        return names;
-      } catch {
-        return [];
-      }
-    },
-
-    /**
-     * Record one hoist, the moment the button is pressed. Always bumps the
-     * local tally so the certificate has a number even offline.
-     *
-     * @returns {Promise<{ok:boolean, total:number|null}>} the new global total
-     *          when known.
+     * Always bumps the local tally so the certificate has a number offline.
      */
     async hoist() {
       ls.set(LS_LOCAL_COUNT, localCount() + 1);
-      pending = null;
 
-      if (!REMOTE) return { ok: false, total: null };
-      if (cooling()) return { ok: false, total: await this.count(), throttled: true };
+      if (!REMOTE) return { ok: false };
+      if (cooling()) return { ok: false, throttled: true };
 
       try {
-        const doc = await post(`/${COLL}`, fields(''));
+        const now = new Date().toISOString();
+        await post(`/${COLL}`, {
+          fields: {
+            at: { timestampValue: now },
+            day: { stringValue: now.slice(0, 10) },
+          },
+        });
         ls.set(LS_LAST_WRITE, Date.now());
-        pending = doc?.name || null;
         /* No count() afterwards. It was an extra aggregation read per hoist, and
            the caller already knows to add one locally — which is both cheaper and
            more responsive than waiting for a round trip to tell it what it just
            did. */
-        return { ok: true, total: null };
+        return { ok: true };
       } catch {
-        return { ok: false, total: null };
-      }
-    },
-
-    /**
-     * Put a name on this browser's most recent hoist. Does not change the
-     * total — the hoist itself was already counted.
-     *
-     * If the patch fails (rules not yet deployed, record never written because
-     * the network was down at the time) it falls back to writing a fresh named
-     * record, so a signature is never lost. That path can count one hoist
-     * twice, which is the right way round: better a name recorded than a
-     * perfectly clean tally.
-     */
-    async sign(name) {
-      const clean = String(name || '').trim().slice(0, 28);
-      if (!REMOTE || !clean) return { ok: false, total: null };
-
-      if (pending) {
-        try {
-          const mask = 'updateMask.fieldPaths=name&updateMask.fieldPaths=signedAt';
-          await send('PATCH', `${ROOT}/${pending}?${mask}`, fields(clean));
-          pending = null;
-          return { ok: true, total: null };
-        } catch { /* fall through to writing a new record */ }
-      }
-
-      try {
-        await post(`/${COLL}`, fields(clean));
-        ls.set(LS_LAST_WRITE, Date.now());
-        /* This path wrote a second record, so the true total is one higher than
-           the caller thinks. It corrects itself at the next CI snapshot, which is
-           the right trade for not spending an aggregation read on every
-           signature. */
-        return { ok: true, total: null, fresh: true };
-      } catch {
-        return { ok: false, total: null };
+        return { ok: false };
       }
     },
   };

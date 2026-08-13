@@ -19,7 +19,7 @@
    Bump VERSION on deploy; activate then drops every older cache outright.
    ========================================================================== */
 
-const VERSION = 'tiranga-v11';
+const VERSION = 'tiranga-v12';
 const NETWORK_TIMEOUT = 1800;
 
 /* Relative so this works both at a domain root and under a GitHub Pages

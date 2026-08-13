@@ -29,7 +29,6 @@
     certName: $('cert-name'), certMeta: $('cert-meta'), certSeal: $('cert-seal'),
     whatsapp: $('whatsapp'), tweet: $('tweet'), share: $('share'), save: $('save'),
     copy: $('copy'), copyLabel: $('copy-label'),
-    wall: $('wall'), roll: $('roll'), rollTrack: $('roll-track'),
     restart: $('restart'), install: $('install'),
     anthemPanel: $('anthem-panel'), anthemPlay: $('anthem-play'),
     anthemLabel: $('anthem-label'), anthemFill: $('anthem-fill'),
@@ -653,10 +652,6 @@
     el.nameHint.textContent = 'Signed. Your name is on the certificate below.';
 
     prepareShare(name);
-    /* Before the write, not after it. The round trip can take seconds on mobile
-       data, and their name belongs in the sky the instant they sign — the same
-       reason the tally bumps optimistically. */
-    addNameLocally(name);
     setStep(3);
     say(`Signed by ${name}. Share it, or save the image.`);
     buzz(25);
@@ -666,11 +661,11 @@
        under way, so let both land before measuring where WhatsApp ended up. */
     setTimeout(COACH.share, 620);
 
-    /* Best-effort, and never blocks the share buttons. The hoist itself was
-       already counted at the press, so this normally only attaches the name —
-       it reports a total only when it had to fall back to writing a fresh
-       record, and then that total is the one to trust. */
-    await window.HoistStore.sign(name);
+    /* Nothing is sent anywhere. The name is on the certificate, in the tweet and
+       in the share link — all of which are built right here — and the hoist
+       itself was already counted at the press. Signing touches no network at
+       all, which is what lets the hint under the box promise that the name stays
+       on the device. */
   });
 
   /* -------------------------------------------------------------- actions */
@@ -809,59 +804,6 @@
     if (signed?.name) el.certSeal.textContent = sealText();
 
     await window.HoistStore.hoist();
-    /* No loadNames() here on purpose. A hoist carries no name, so the wall
-       cannot have changed because of it, and re-reading it was costing every
-       visitor a third query for nothing. */
-  }
-
-  /* ------------------------------------------------------- the wall of names */
-
-  /* How long one name takes to travel the full height of the column, and how
-     many ride it at once. Slow and few: this sits behind the ceremony and must
-     never pull the eye off the flag. */
-  const ROLL_MS = 19000;
-  const ROLL_MAX = 10;
-
-  /**
-   * The names, in two places at once: drifting up the sky for whoever is
-   * watching, and as a plain line of text in the share card for whoever is
-   * reading with a screen reader or has motion turned off.
-   */
-  function renderNames(names) {
-    if (!names.length) return;
-
-    el.wall.hidden = false;
-    el.wall.innerHTML = '';
-    const b = document.createElement('b');
-    b.textContent = names.slice(0, 8).join(' · ');
-    el.wall.append(document.createTextNode('Hoisted here by '), b);
-
-    const riders = names.slice(0, ROLL_MAX);
-    el.roll.style.setProperty('--roll-ms', `${ROLL_MS}ms`);
-    el.rollTrack.innerHTML = '';
-    riders.forEach((name, i) => {
-      const span = document.createElement('span');
-      span.className = 'roll__name';
-      span.textContent = name;
-      /* Spread over the loop with negative delays, so the column is already
-         full of names on the first frame instead of filling up over 19s. */
-      span.style.animationDelay = `${-((i / riders.length) * ROLL_MS).toFixed(0)}ms`;
-      el.rollTrack.appendChild(span);
-    });
-    el.roll.hidden = false;
-  }
-
-  async function loadNames() {
-    renderNames(await window.HoistStore.recent(ROLL_MAX));
-  }
-
-  /* Their own name, straight into the sky. The snapshot that everyone else's
-     name arrives in is minutes old, and waiting for the next one to see yourself
-     would make signing feel like it had not worked. */
-  function addNameLocally(name) {
-    const known = [...el.rollTrack.children].map((n) => n.textContent);
-    if (known.some((n) => n.toLocaleLowerCase() === name.toLocaleLowerCase())) return;
-    renderNames([name, ...known].slice(0, ROLL_MAX));
   }
 
   /* Straight away, with the seed, rather than after the first round trip — that
@@ -876,16 +818,8 @@
          querying Firestore directly only matters before CI has ever written
          wall.json, or if it is unreachable. */
       const snap = await window.HoistStore.snapshot();
-      if (snap) {
-        serverTotal = snap.count;
-        paintTally();
-        renderNames(snap.names);
-        return;
-      }
-      const total = await window.HoistStore.count();
-      if (typeof total === 'number') serverTotal = total;
+      serverTotal = snap ? snap.count : await window.HoistStore.count();
       paintTally();
-      loadNames();
     })();
   }
 

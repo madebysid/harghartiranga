@@ -4,7 +4,8 @@ A one-click flag hoisting for Indian Independence Day. The Union Jack comes down
 the Tiranga goes up furled, unfurls at the top and releases flower petals, the
 sky turns from pre-dawn to sunrise. Then you sign it with your name and tweet it.
 
-**Live: https://harghartiranga-2026.web.app**
+**Live: https://harghartiranga.pages.dev**  
+(Cloudflare Pages, because its free bandwidth is unmetered. `harghartiranga-2026.web.app` mirrors it.)
 
 Installable, works offline. No build step, no dependencies, no framework.
 
@@ -29,7 +30,9 @@ flags/*.svg           the two flags
 fort-wall.svg         tiling Red Fort curtain wall
 fort-gate.svg         the Lahori Gate
 icons/                app icons (192, 512, maskable, apple-touch)
-anthem.mp3            the anthem, ID3 artwork stripped
+anthem-hoist.mp3      the closing 14 seconds — all the ceremony plays
+anthem-full.mp3       all 62 seconds, fetched only on request
+wall.json             the hoist count, refreshed by CI every 10 minutes
 og.png                social preview card
 tools/                regenerates every image above
 ```
@@ -109,10 +112,17 @@ page is served from, so tweets and shared links are correct with it left blank.
 
 ## Turn on the live counter (optional)
 
-Without this the app works completely; it just has no shared count and no wall of
-names. With it you get "12,481 hoisted" in the corner of the sky, a hoist number
-on each certificate, and the names of recent hoisters drifting up the right-hand
-side of the scene.
+Without this the app works completely; it just has no shared count. With it you
+get "12,481 hoisted" in the corner of the sky and a hoist number on each
+certificate.
+
+**Names are never stored.** Somebody types a name to put on their own certificate
+and into their own share message, and it stays in their browser — signing makes no
+network request at all. There was a wall of names drifting up the sky; it is gone
+deliberately. A security rule can refuse a link or a phone number, but nothing can
+judge whether a name is offensive, so a public wall of user-supplied text was the
+one risk in this app that could not be defended against. Removing it also halves
+the writes: one per hoist instead of one per hoist plus one per signature.
 
 1. Firebase console → your project → **Firestore Database → Create database**,
    production mode, region `asia-south1` (Mumbai).
@@ -136,23 +146,26 @@ side of the scene.
 The API key in `config.js` is a public browser key and is safe to commit —
 `firestore.rules` is what controls access, not the key.
 
-**How it talks to Firestore.** Plain `fetch` against the Firestore REST API:
-`:runAggregationQuery` for the count, `:runQuery` for recent names, a document
-create per hoist, and a `PATCH` if that hoist is later signed. No Firebase SDK,
-which is why there is no build step. Every call fails soft — if Firestore is
-unreachable the ceremony and the share buttons carry on as normal.
+**How it talks to Firestore.** Plain `fetch` against the REST API — no Firebase
+SDK, which is why there is no build step. A browser makes exactly **one** call, a
+document create, and only when somebody hoists. It never reads: the count comes
+from `wall.json`, a static file that CI regenerates every ten minutes with a
+single `:runAggregationQuery`. Every call fails soft — if Firestore is unreachable
+the ceremony, the certificate and the share buttons carry on as normal.
 
-**What counts as a hoist.** The press of the button, not the signature. The
-record is written the moment the flag starts moving, with an empty `name`; if a
-name is typed afterwards it is patched onto that same record. So the tally
-counts everyone who hoists, the wall of names lists the subset who signed, and
-nobody is counted twice. Writes are throttled to one per browser every 2.5s,
-which only ever catches a double-tap — a ceremony takes about six seconds.
+Reads used to happen in the browser, twice per page load. That does not scale on
+the free tier, and not for the obvious reason: a `count()` aggregation is billed
+one read per thousand documents matched, so the cost per visitor *grew with the
+collection*. At a hundred thousand records it was about 232 reads a visitor and
+the free 50,000-a-day allowance was gone after roughly two hundred people. The
+snapshot moves that from O(visitors) to O(1).
 
-Because a nameless record has to be legal, `firestore.rules` allows `name` to be
-empty on create and allows exactly one update: an empty name becoming a real
-one. **Deploy the rules after pulling this change or the counter will not
-move** — the old rules reject a record without a name.
+**What counts as a hoist.** The press of the button, not the signature. Most
+people never type a name, and they hoisted the flag all the same. Writes are
+throttled to one per browser every 2.5s, which only ever catches a double-tap —
+a ceremony takes about six seconds. The displayed tally is the snapshot plus
+whatever this browser has done since, so your own hoist always shows immediately
+even though everyone else's arrives on the next refresh.
 
 **If it gets spammed.** Writes are open by design, since there is no sign-in.
 Turn on **App Check** (Firebase console → App Check → reCAPTCHA v3) to reject
@@ -163,20 +176,16 @@ therefore advisory, and only App Check can tell your page apart from `curl`.
 `firestore.rules` does the rest of the work, and it is worth knowing what each
 part is defending:
 
-- **`nameShaped`** rejects links, `@handles` and 3-or-more-digit runs, which is
-  what spam on a public wall actually looks like. `app.js` applies the same test
-  before writing so a rejected name produces a sentence rather than silence. It
-  cannot judge whether a name is offensive — nothing here can. That is why the
-  wall shows first names only, and why being able to delete matters.
-- **`sane`** bounds both timestamps: generous in the past, because cheap handsets
-  have wrong clocks, and tight in the future, because the wall is ordered by
-  `signedAt` and an unbounded one would let somebody date a record to 2099 and
-  pin their name to the top of it forever.
-- **The 30-minute update window** stops a passer-by putting a name on somebody
-  else's unsigned hoist long after the fact.
-- **Deletes are refused outright**, so nothing on the wall can be erased from a
-  browser. Moderate with the CLI:
-  `firebase firestore:delete "hoists/<id>" --force --project <id>`.
+- **A record carries nothing but `at` and `day`.** No name, no device
+  information, nothing about who hoisted. `name` is tolerated while empty so that
+  a browser running the previous build cannot be broken by the current rules.
+- **`sane`** bounds the timestamp: generous in the past, because cheap handsets
+  have wrong clocks, and tight in the future, because without a ceiling a record
+  dated 2099 would sit at the head of the collection forever.
+- **Updates and deletes are both refused.** A hoist is a fact about a moment;
+  nothing can revise it and nothing can erase it. The previous build allowed one
+  update — an empty name becoming a real one, which is what signing did — and
+  that permission is withdrawn now that names never arrive.
 
 **Security headers** are set for every path in `firebase.json`. The one that
 earns its keep is `script-src 'self'`: every script the app runs is a file in
