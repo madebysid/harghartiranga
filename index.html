@@ -118,6 +118,15 @@
 
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
+  <!-- Everyone who has signed a hoist, drifting up the right-hand side of the
+       sky. aria-hidden because it is a moving decoration: the same names are
+       listed as plain text down in the share card, which is what a screen
+       reader should get. -->
+  <div class="roll" id="roll" aria-hidden="true" hidden>
+    <p class="roll__label">Hoisted by</p>
+    <div class="roll__track" id="roll-track"></div>
+  </div>
+
   <!-- Top-left, mirroring the sound button, so the running total is on screen
        throughout the ceremony rather than buried under it. -->
   <p class="tally" id="tally" hidden>
@@ -145,6 +154,14 @@
 
   <p class="invite" id="invite" hidden></p>
 
+  <!-- Where you are in the three steps. Present from the first paint, so the
+       whole flow is visible before anything is pressed. -->
+  <ol class="rail" id="rail" aria-label="How it works">
+    <li class="rail__step" data-state="now"><b>1</b><span>Hoist</span></li>
+    <li class="rail__step" data-state="todo"><b>2</b><span>Sign</span></li>
+    <li class="rail__step" data-state="todo"><b>3</b><span>Share</span></li>
+  </ol>
+
   <!-- Step 1 ────────────────────────────────────────────────────────────── -->
   <section class="card" id="step-hoist">
     <p class="eyebrow">15 August · <span id="ordinal">Independence Day</span></p>
@@ -153,6 +170,10 @@
       One flag came down. Ours went up. <span id="years-ago"></span>
       later, do it again — with your own hands.
     </p>
+
+    <!-- Nothing goes below this button and nothing above it but the headline, so
+         it stays reachable without scrolling on a phone. What to do with it is
+         coach.js's job — a bubble anchored to the button itself. -->
     <button class="btn btn--hero" id="hoist" type="button">
       <span class="btn__label">Hoist the Tiranga</span>
       <span class="btn__shine" aria-hidden="true"></span>
@@ -175,13 +196,18 @@
                spellcheck="false" required>
         <button class="btn" type="submit">Sign</button>
       </div>
-      <p class="namer__hint" id="name-hint">Your name goes on the certificate and in the tweet.</p>
+      <p class="namer__hint" id="name-hint">Type your name and press Sign — it goes on your certificate and joins the names drifting up the sky.</p>
     </form>
   </section>
 
   <!-- Step 3 ────────────────────────────────────────────────────────────── -->
   <section class="card" id="step-share" hidden>
-    <div class="certificate" id="certificate">
+    <p class="eyebrow" id="share-eyebrow">Pass it on</p>
+
+    <!-- Holds the name once there is one. Until then the share buttons below
+         are live anyway: plenty of people will never type a name, and they
+         should still be able to send the link. -->
+    <div class="certificate" id="certificate" hidden>
       <div class="certificate__band" aria-hidden="true"></div>
       <p class="certificate__kicker">Hoisted by</p>
       <p class="certificate__name" id="cert-name"></p>
@@ -190,6 +216,12 @@
     </div>
 
     <div class="actions">
+      <a class="btn btn--whatsapp" id="whatsapp" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor">
+          <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.85 9.85 0 0 0 12.04 2zm5.8 14.06c-.24.68-1.4 1.3-1.93 1.35-.53.06-1.02.24-3.47-.72-2.96-1.16-4.82-4.22-4.97-4.42-.14-.2-1.17-1.56-1.17-2.97 0-1.42.74-2.11 1-2.4.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.56.8 1.94.87 2.08.07.14.12.31.02.5-.09.19-.5.72-.68.9-.13.13-.28.28-.11.55.17.27.75 1.24 1.6 2 1.1.98 1.87 1.25 2.14 1.39.27.14.43.12.59-.07.16-.19.7-.81.89-1.09.19-.28.37-.22.62-.13.25.09 1.6.75 1.87.89.27.14.46.2.53.31.07.12.07.68-.17 1.36z"/>
+        </svg>
+        <span>WhatsApp</span>
+      </a>
       <a class="btn btn--tweet" id="tweet" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor">
           <path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.63l-5.2-6.8-5.94 6.8H1.74l7.49-8.56L1.08 2.25h6.8l4.71 6.23zm-1.16 17.52h1.83L5.83 4.13H3.86z"/>
@@ -202,7 +234,7 @@
         </svg>
         <span>Share</span>
       </button>
-      <button class="btn btn--ghost" id="save" type="button">
+      <button class="btn btn--ghost" id="save" type="button" hidden>
         <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v13"/><path d="M8 12l4 4 4-4"/><path d="M4 20h16"/>
         </svg>
@@ -216,7 +248,7 @@
       </button>
     </div>
 
-    <p class="wall-of-names" id="wall" hidden></p>
+    <p class="names" id="wall" hidden></p>
     <button class="restart" id="restart" type="button">Hoist again</button>
   </section>
 
@@ -259,6 +291,7 @@
 <script src="anthem.js"></script>
 <script src="store.js"></script>
 <script src="certificate.js"></script>
+<script src="coach.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

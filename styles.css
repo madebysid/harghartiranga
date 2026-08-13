@@ -501,6 +501,83 @@ body {
   pointer-events: none;
 }
 
+/* ================================================ the names, drifting upward */
+
+/* Down the right-hand side of the sky, well clear of the flag on the left and
+   of the sound button above. It is scenery, not a feed: slow, dim, and it never
+   moves anything else on the page. */
+.roll {
+  --roll-h: min(30svh, 260px);
+  position: absolute;
+  z-index: 3;
+  top: calc(64px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  width: min(30vw, 9rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: right;
+  pointer-events: none;
+}
+
+.roll__label {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.3);
+}
+
+/* Fixed height, because the rise animation travels exactly one column height and
+   a percentage translate would resolve against each name's own line box. */
+.roll__track {
+  position: relative;
+  height: var(--roll-h);
+  overflow: hidden;
+  -webkit-mask: linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
+  mask: linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
+}
+
+.roll__name {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--serif);
+  font-size: 0.86rem;
+  color: #ffe6c8;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
+  opacity: 0;
+  animation: roll-rise var(--roll-ms, 19s) linear infinite;
+  will-change: transform;
+}
+
+/* Transform only — ten of these run for as long as the page is open, alongside
+   the cloth simulation, so none of it may touch layout. */
+@keyframes roll-rise {
+  0%   { transform: translateY(0); opacity: 0; }
+  14%  { opacity: 0.62; }
+  84%  { opacity: 0.62; }
+  100% { transform: translateY(calc(var(--roll-h) * -1)); opacity: 0; }
+}
+
+/* On a phone the flag fills the width the names were using, so they move down
+   into the empty sky between the flag's lower edge and the ramparts. Anchored to
+   the bottom of the stage rather than the top, because that is the edge the free
+   space is measured from. */
+@media (max-width: 560px) {
+  .roll {
+    top: auto;
+    bottom: 15%;
+    width: 7.4rem;
+    --roll-h: min(20svh, 140px);
+  }
+  .roll__name { font-size: 0.78rem; }
+}
+
 /* =============================================== scene chrome (sound/skip) */
 
 .sound, .skip-ceremony {
@@ -618,6 +695,173 @@ body {
 
 .lede { margin: 0; color: var(--ink-dim); max-width: 46ch; }
 
+/* ------------------------------------------------------- the three-step rail */
+
+/* Visible from the first paint, before anything has been pressed, so the whole
+   flow — hoist, sign, share — is known in advance rather than discovered one
+   surprise at a time. */
+.rail {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  font-size: 0.77rem;
+  letter-spacing: 0.05em;
+}
+.rail__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-faint);
+  transition: color 240ms;
+}
+.rail__step b {
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 600;
+  transition: background 240ms, color 240ms, border-color 240ms;
+}
+/* The connector belongs to the step before the gap, so it never trails off the
+   end of the row. */
+.rail__step:not(:last-child)::after {
+  content: '';
+  width: clamp(0.7rem, 4vw, 1.6rem);
+  height: 1px;
+  margin-left: 0.25rem;
+  background: var(--line);
+}
+.rail__step[data-state='now'] { color: var(--ink); }
+.rail__step[data-state='now'] b {
+  background: var(--saffron);
+  border-color: transparent;
+  color: #1c1305;
+  box-shadow: 0 0 0 4px rgb(255 153 51 / 0.15);
+}
+.rail__step[data-state='done'] { color: var(--ink-dim); }
+.rail__step[data-state='done'] b {
+  background: rgb(19 136 8 / 0.85);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ============================================================ the walkthrough */
+
+/* A coach mark: a ring on the thing to press and a bubble hanging off it. Both
+   are position: fixed and driven from coach.js, which measures the target.
+
+   pointer-events stays none on everything except the dismiss button, so the
+   walkthrough can never intercept the press it is asking for. */
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+/* Set while the target is scrolled out of view: keep the layout, drop the paint,
+   rather than pointing a tail at something off screen. */
+.coach[data-off] { opacity: 0; }
+
+.coach__ring {
+  position: fixed;
+  border: 2px solid var(--saffron);
+  box-shadow: 0 0 0 0 rgb(255 153 51 / 0.55);
+  animation: coach-pulse 1.9s cubic-bezier(0.24, 0.6, 0.3, 1) infinite;
+}
+@keyframes coach-pulse {
+  0%        { box-shadow: 0 0 0 0 rgb(255 153 51 / 0.5); }
+  70%, 100% { box-shadow: 0 0 0 11px rgb(255 153 51 / 0); }
+}
+
+/* Cream on a near-black page: the bubble has to read as a layer above the app,
+   and a dark bubble on a dark scene does not. */
+.coach__bubble {
+  position: fixed;
+  max-width: min(19rem, calc(100vw - 2.2rem));
+  padding: 0.7rem 2rem 0.75rem 0.85rem;
+  border-radius: 15px;
+  background: linear-gradient(180deg, #fff8ec, #ffe4bd);
+  color: #2b1d08;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 0.5), 0 2px 0 rgb(255 255 255 / 0.5) inset;
+}
+
+/* Positioning is left/top from JS so transform stays free for the animations —
+   an animation on transform would otherwise overwrite the placement. */
+.coach__bubble.is-in {
+  animation:
+    coach-in 340ms cubic-bezier(0.34, 1.56, 0.5, 1) both,
+    coach-bob 2.6s ease-in-out 420ms infinite;
+}
+@keyframes coach-in {
+  from { opacity: 0; transform: scale(0.9) translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes coach-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* A rotated square, so the two visible edges pick up the bubble's own corner
+   radius. Its colour is the gradient stop nearest that edge — `inherit` cannot
+   carry a gradient across to a smaller box. */
+.coach__tail {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 3px;
+}
+.coach__bubble[data-place='below'] .coach__tail { top: -5px; background: #fff8ec; }
+.coach__bubble[data-place='above'] .coach__tail { bottom: -5px; background: #ffe4bd; }
+/* Beside the target: the tail leaves the left edge halfway down, so it takes the
+   gradient's middle rather than either end. */
+.coach__bubble[data-place='right'] .coach__tail {
+  transform: translateY(-50%) rotate(45deg);
+  background: #fff0d7;
+}
+
+.coach__chip {
+  display: inline-block;
+  margin-bottom: 0.3rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgb(43 29 8 / 0.1);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #7a5410;
+}
+
+.coach__text { margin: 0; font-size: 0.95rem; font-weight: 600; line-height: 1.35; }
+.coach__sub { margin: 0.2rem 0 0; font-size: 0.82rem; line-height: 1.4; color: rgb(43 29 8 / 0.66); }
+
+.coach__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgb(43 29 8 / 0.42);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.coach__close:hover { background: rgb(43 29 8 / 0.08); color: #2b1d08; }
+.coach__close:focus-visible { outline: 2px solid #2b1d08; outline-offset: 1px; }
+
 .invite {
   margin: 0;
   padding: 0.7rem 0.95rem;
@@ -700,6 +944,10 @@ body {
 
 .btn--tweet { --btn-bg: linear-gradient(180deg, #23262b, #0d0f12); color: #fff; box-shadow: none; border: 1px solid rgb(255 255 255 / 0.16); }
 
+/* First in the row and in its own colour, because on a phone in India this is
+   the button that actually gets used. */
+.btn--whatsapp { --btn-bg: linear-gradient(180deg, #3ad673, #1aa54f); color: #04220f; box-shadow: 0 6px 20px rgb(26 165 79 / 0.24); }
+
 .counter { margin: 0; font-size: 0.86rem; color: var(--ink-faint); }
 .counter b { color: var(--saffron); font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -754,8 +1002,11 @@ body {
 .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .actions .btn { padding: 0.7rem 1.1rem; font-size: 0.94rem; }
 
-.wall { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--ink-faint); line-height: 1.7; }
-.wall b { color: var(--ink-dim); font-weight: 500; }
+/* The same names that drift up the sky, as plain text. Named .names, not .wall:
+   the fort's curtain wall up in the scene is .wall, and a second .wall rule down
+   here was quietly setting a margin and a font size on the stonework. */
+.names { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--ink-faint); line-height: 1.7; }
+.names b { color: var(--ink-dim); font-weight: 500; }
 
 .restart {
   justify-self: start;
@@ -871,6 +1122,40 @@ body {
   .actions .btn { flex: 1 1 auto; }
 }
 
+/* The hoist button, and the arrow pointing at it, have to be on screen when the
+   page opens — a call to action below the fold is a call to action nobody makes.
+   On a phone the scene gives up the height for it. */
+@media (max-width: 560px) {
+  :root { --pole-h: 39svh; }
+  .stage { height: min(55svh, 470px); }
+  .console { padding-block: 1.1rem 0.9rem; gap: 0.85rem; }
+  .card { gap: 0.7rem; }
+}
+
+/* Shorter phones — an SE, or any handset with a browser bar eating the bottom.
+   Portrait only: landscape has its own rule below and a different problem. */
+@media (max-height: 700px) and (orientation: portrait) {
+  :root { --pole-h: 34svh; }
+  .stage { height: min(47svh, 400px); }
+  .lede { font-size: 0.94rem; }
+}
+
+/* Smaller again — a 360×640 Android. The headline gives up a little size too. */
+@media (max-height: 660px) and (orientation: portrait) {
+  :root { --pole-h: 31svh; }
+  .stage { height: min(43svh, 360px); min-height: 260px; }
+  .display { font-size: clamp(1.85rem, 7.4vw, 2.5rem); }
+}
+
+/* Laptops in a short window — a 1280×720 screen with browser chrome on top. Wide
+   enough to be a real desktop, tall enough not to be a phone on its side, and
+   the button was landing 60px under the fold. */
+@media (min-width: 900px) and (max-height: 800px) and (min-height: 560px) {
+  :root { --pole-h: 38svh; }
+  .stage { height: min(50svh, 420px); }
+  .console { padding-block: 1.2rem 1rem; }
+}
+
 /* Short landscape phones: shrink the stage so the controls stay reachable. */
 @media (max-height: 620px) and (orientation: landscape) {
   .stage { height: 74svh; }
@@ -890,4 +1175,21 @@ body {
   .stage[data-phase='unfurl'] .snap { animation: none; }
   .card { animation: none; }
   .btn:hover { transform: none; }
+
+  /* The walkthrough keeps its ring and its bubble — they are what makes it a
+     walkthrough — and loses the pulse and the bob. */
+  .coach__ring { animation: none; box-shadow: 0 0 0 4px rgb(255 153 51 / 0.18); }
+  .coach__bubble.is-in { animation: none; }
+
+  /* The names stop drifting and simply stack, newest at the bottom. Without
+     the animation every name would otherwise pile up on the same baseline. */
+  .roll__track {
+    height: auto;
+    display: grid;
+    gap: 0.2rem;
+    -webkit-mask: none;
+    mask: none;
+  }
+  .roll__name { position: static; animation: none; opacity: 0.55; }
+  .roll__name:nth-child(n+5) { display: none; }
 }

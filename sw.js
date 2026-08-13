@@ -19,7 +19,7 @@
    Bump VERSION on deploy; activate then drops every older cache outright.
    ========================================================================== */
 
-const VERSION = 'tiranga-v5';
+const VERSION = 'tiranga-v7';
 const NETWORK_TIMEOUT = 1800;
 
 /* Relative so this works both at a domain root and under a GitHub Pages
@@ -34,6 +34,7 @@ const PRECACHE = [
   'celebrate.js',
   'store.js',
   'certificate.js',
+  'coach.js',
   'app.js',
   'manifest.webmanifest',
   'favicon.svg',

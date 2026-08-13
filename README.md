@@ -20,6 +20,7 @@ cloth.js              the waving flag, drawn per-column on a canvas
 celebrate.js          confetti, streamers and flower petals
 store.js              optional shared hoist counter (Firestore over REST)
 certificate.js        the 1080×1350 shareable PNG, drawn on a canvas
+coach.js              the walkthrough — coach marks anchored to each control
 
 manifest.webmanifest  installable-app metadata
 sw.js                 service worker: offline, cache strategy
@@ -109,8 +110,9 @@ page is served from, so tweets and shared links are correct with it left blank.
 ## Turn on the live counter (optional)
 
 Without this the app works completely; it just has no shared count and no wall of
-names. With it you get "12,481 flags hoisted here so far", a hoist number on each
-certificate, and the most recent names.
+names. With it you get "12,481 hoisted" in the corner of the sky, a hoist number
+on each certificate, and the names of recent hoisters drifting up the right-hand
+side of the scene.
 
 1. Firebase console → your project → **Firestore Database → Create database**,
    production mode, region `asia-south1` (Mumbai).
@@ -136,9 +138,21 @@ The API key in `config.js` is a public browser key and is safe to commit —
 
 **How it talks to Firestore.** Plain `fetch` against the Firestore REST API:
 `:runAggregationQuery` for the count, `:runQuery` for recent names, a document
-create per hoist. No Firebase SDK, which is why there is no build step. Writes
-are throttled to one per browser per minute, and every call fails soft — if
-Firestore is unreachable the ceremony and the share buttons carry on as normal.
+create per hoist, and a `PATCH` if that hoist is later signed. No Firebase SDK,
+which is why there is no build step. Every call fails soft — if Firestore is
+unreachable the ceremony and the share buttons carry on as normal.
+
+**What counts as a hoist.** The press of the button, not the signature. The
+record is written the moment the flag starts moving, with an empty `name`; if a
+name is typed afterwards it is patched onto that same record. So the tally
+counts everyone who hoists, the wall of names lists the subset who signed, and
+nobody is counted twice. Writes are throttled to one per browser every 2.5s,
+which only ever catches a double-tap — a ceremony takes about six seconds.
+
+Because a nameless record has to be legal, `firestore.rules` allows `name` to be
+empty on create and allows exactly one update: an empty name becoming a real
+one. **Deploy the rules after pulling this change or the counter will not
+move** — the old rules reject a record without a name.
 
 **If it gets spammed.** Writes are open by design, since there is no sign-in.
 Turn on **App Check** (Firebase console → App Check → reCAPTCHA v3) to reject
@@ -153,7 +167,7 @@ appears in the page once the browser offers the install prompt; on iOS it is
 Share → Add to Home Screen. Installed, it opens without browser chrome, keeps its
 own icon, and respects the notch and home indicator via `env(safe-area-inset-*)`.
 
-**It works with no connection.** The service worker precaches all 21 files, so
+**It works with no connection.** The service worker precaches all 22 files, so
 once the page has been opened a single time it opens again on a dead network —
 the hoisting, the certificate and the saved image need nothing from a server.
 Only the shared counter does.

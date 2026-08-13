@@ -22,12 +22,15 @@
     sound: $('sound'), skip: $('skip'),
     invite: $('invite'), ordinal: $('ordinal'), yearsAgo: $('years-ago'),
     hoist: $('hoist'), tally: $('tally'), tallyNum: $('tally-num'),
+    rail: $('rail'),
     stepHoist: $('step-hoist'), stepName: $('step-name'), stepShare: $('step-share'),
     namer: $('namer'), name: $('name'), nameHint: $('name-hint'),
+    certificate: $('certificate'),
     certName: $('cert-name'), certMeta: $('cert-meta'), certSeal: $('cert-seal'),
-    tweet: $('tweet'), share: $('share'), save: $('save'),
+    whatsapp: $('whatsapp'), tweet: $('tweet'), share: $('share'), save: $('save'),
     copy: $('copy'), copyLabel: $('copy-label'),
-    wall: $('wall'), restart: $('restart'), install: $('install'),
+    wall: $('wall'), roll: $('roll'), rollTrack: $('roll-track'),
+    restart: $('restart'), install: $('install'),
     anthemPanel: $('anthem-panel'), anthemPlay: $('anthem-play'),
     anthemLabel: $('anthem-label'), anthemFill: $('anthem-fill'),
     anthemNote: $('anthem-note'),
@@ -36,6 +39,46 @@
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* The hint as authored in index.html. Signing rewrites it, and "Hoist again"
+     has to be able to put it back. */
+  const DEFAULT_NAME_HINT = el.nameHint.textContent;
+
+  /* ─────────────────────────────────────────────────────────── walkthrough ── */
+
+  /* Three coach marks, one per step, each pointing at the single control that
+     moves things along. `on` is what retires the bubble: pressing the button,
+     or the first keystroke in the name box — so it clears the moment somebody
+     starts doing the thing rather than sitting there being explained at. */
+  const COACH = {
+    hoist: () => window.Coach.point({
+      target: el.hoist,
+      chip: 'Step 1 of 3',
+      text: 'Tap here to hoist the flag',
+      sub: 'Nothing to fill in. Takes about six seconds.',
+      place: 'below',
+      on: 'click',
+    }),
+    name: () => window.Coach.point({
+      target: el.name,
+      chip: 'Step 2 of 3',
+      text: 'Type your name here',
+      sub: 'It goes on your certificate. Skip it if you like — sharing works either way.',
+      place: 'below',
+      on: 'input',
+    }),
+    share: () => window.Coach.point({
+      target: el.whatsapp,
+      chip: 'Step 3 of 3',
+      text: 'Send it to someone',
+      sub: 'WhatsApp opens straight on your contacts.',
+      /* Below, so it does not cover the certificate that has just appeared above
+         the buttons — that is the thing they earned. It lands over the second
+         row of buttons instead, and the overlay lets clicks straight through. */
+      place: 'below',
+      on: 'click',
+    }),
+  };
 
   /* Matches .carriage { top: 18px } and the gap kept above the pole base. */
   const CARRIAGE_TOP = 18;
@@ -182,6 +225,16 @@
   const setPhase = (p) => { el.stage.dataset.phase = p; };
   const say = (msg) => { el.announce.textContent = msg; };
 
+  /** Light up step `n` of three on the rail, and tick off the ones behind it. */
+  function setStep(n) {
+    [...el.rail.children].forEach((li, i) => {
+      const step = i + 1;
+      li.dataset.state = step < n ? 'done' : step === n ? 'now' : 'todo';
+      if (step === n) li.setAttribute('aria-current', 'step');
+      else li.removeAttribute('aria-current');
+    });
+  }
+
   const buzz = (pattern) => {
     if (reduced.matches) return;
     try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }
@@ -230,7 +283,14 @@
        primed for a later play() call. */
     anthem.unlock();
     el.hoist.disabled = true;
+    window.Coach.hide(); // step 1 is happening; nothing to point at
     el.skip.hidden = reduced.matches;
+
+    /* Counted here, at the press — not at the signature. Most people never type
+       a name, and they hoisted the flag all the same. Fire-and-forget: the
+       ceremony must not wait on a network round trip. */
+    countThisHoist();
+
     say('Lowering the Union Flag.');
     Sound.rope(T.lower / 1000 + 0.2);
     buzz(18);
@@ -299,8 +359,17 @@
     el.invite.hidden = true; // whoever invited them has served their purpose
     el.stepHoist.hidden = true;
     el.stepName.hidden = false;
-    say('The Tiranga is flying. Enter your name to sign the hoisting.');
+    /* The share buttons appear with the name field, not after it. Most people
+       will not type a name — some will not work out that they can — and none of
+       that should stand between them and sending the link on. */
+    el.stepShare.hidden = false;
+    prepareShare(null);
+    setStep(2);
+    say('The Tiranga is flying. Sign it with your name, or share it as it is.');
     if (!matchMedia('(hover: none)').matches) el.name.focus({ preventScroll: true });
+    /* After the reveal, not during it: the card has to be laid out before the
+       bubble can be hung off the name box. */
+    COACH.name();
   }
 
   function skipCeremony() {
@@ -334,8 +403,15 @@
     el.stepShare.hidden = true;
     el.stepName.hidden = true;
     el.stepHoist.hidden = false;
+    el.certificate.hidden = true;
     el.namer.reset();
+    delete el.nameHint.dataset.error;
+    el.nameHint.textContent = DEFAULT_NAME_HINT;
+    signed = null;
+    myHoistNumber = null;
+    setStep(1);
     scrollTo({ top: 0, behavior: 'smooth' });
+    COACH.hoist();
   }
 
   el.hoist.addEventListener('click', ceremony);
@@ -481,15 +557,20 @@
     return location.origin + location.pathname.replace(/index\.html$/, '');
   };
 
-  let signed = null; // { name, at, shareUrl, hoistNumber }
+  let signed = null;         // { name, at, shareUrl } — name is null until signed
+  let myHoistNumber = null;  // this visitor's place in the tally, once known
+
+  /** What the message says. Without a name it speaks for itself. */
+  const shareLine = (name) => (name
+    ? `I just hoisted the Tiranga 🇮🇳 — ${name}. ${yearsFree} years of freedom. Jai Hind!`
+    : `I just hoisted the Tiranga 🇮🇳 ${yearsFree} years of freedom. Hoist yours — it takes six seconds. Jai Hind!`);
 
   function tweetHref({ name, shareUrl }) {
     const handle = (CFG.twitterHandle || '').replace(/^@/, '').trim();
     const lines = [
       'I just hoisted the Tiranga 🇮🇳',
       '',
-      `— ${name}`,
-      '',
+      ...(name ? [`— ${name}`, ''] : []),
       `${yearsFree} years of freedom. Jai Hind!`,
       '',
       /* Spelled out in the body rather than passed as `via`, which Twitter
@@ -503,46 +584,80 @@
     return `https://twitter.com/intent/tweet?${params}`;
   }
 
+  /* wa.me with no number opens the contact picker, which is exactly the "send
+     this to someone" flow. WhatsApp takes one text field, so the link is part
+     of it rather than a separate parameter. */
+  function whatsappHref({ name, shareUrl }) {
+    const text = `${shareLine(name)}\n${shareUrl}`;
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }
+
+  const sealText = () => (myHoistNumber
+    ? `Hoist #${myHoistNumber.toLocaleString('en-IN')} · Har Ghar Tiranga`
+    : 'Har Ghar Tiranga');
+
+  /**
+   * Point every share action at the current state. Called once with null the
+   * moment the flag is up, and again with the name if one is ever typed.
+   */
+  function prepareShare(name) {
+    const at = signed?.at || new Date();
+    const shareUrl = name ? `${siteBase()}?by=${encodeURIComponent(name)}` : siteBase();
+    signed = { name, at, shareUrl };
+
+    el.tweet.href = tweetHref(signed);
+    el.whatsapp.href = whatsappHref(signed);
+
+    /* The image has a name printed across the middle of it, so that one button
+       waits until there is a name to print. */
+    el.save.hidden = !name;
+    el.certificate.hidden = !name;
+
+    if (name) {
+      const dateText = at.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+      const timeText = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      el.certName.textContent = name;
+      el.certMeta.textContent = `${dateText} · ${timeText}`;
+      el.certSeal.textContent = sealText();
+    }
+  }
+
   el.namer.addEventListener('submit', async (event) => {
     event.preventDefault();
     const name = cleanName(el.name.value);
 
     if (!name) {
-      el.nameHint.textContent = 'Please enter a name first.';
+      el.nameHint.textContent = 'Type your name in the box first — or skip it and just share the link.';
       el.nameHint.dataset.error = '';
       el.name.focus();
       return;
     }
     delete el.nameHint.dataset.error;
-    el.nameHint.textContent = 'Your name goes on the certificate and in the tweet.';
+    el.nameHint.textContent = 'Signed. Your name is on the certificate below.';
 
-    const at = new Date();
-    const shareUrl = `${siteBase()}?by=${encodeURIComponent(name)}`;
-    signed = { name, at, shareUrl, hoistNumber: null };
-
-    const dateText = at.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeText = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-
-    el.certName.textContent = name;
-    el.certMeta.textContent = `${dateText} · ${timeText}`;
-    el.certSeal.textContent = 'Har Ghar Tiranga';
-    el.tweet.href = tweetHref(signed);
-
-    el.stepName.hidden = true;
-    el.stepShare.hidden = false;
+    prepareShare(name);
+    setStep(3);
     say(`Signed by ${name}. Share it, or save the image.`);
     buzz(25);
     if (!reduced.matches) party.burst(flagBox(), burstScale() * 0.45);
     el.stepShare.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    /* The certificate has just appeared above the buttons and a smooth scroll is
+       under way, so let both land before measuring where WhatsApp ended up. */
+    setTimeout(COACH.share, 620);
 
-    /* Recording is best-effort and never blocks the share buttons. */
-    const result = await window.HoistStore.record(name);
+    /* Best-effort, and never blocks the share buttons. The hoist itself was
+       already counted at the press, so this normally only attaches the name —
+       it reports a total only when it had to fall back to writing a fresh
+       record, and then that total is the one to trust. */
+    const result = await window.HoistStore.sign(name);
     if (typeof result.total === 'number') {
-      signed.hoistNumber = shown(result.total);
-      el.certSeal.textContent = `Hoist #${signed.hoistNumber.toLocaleString('en-IN')} · Har Ghar Tiranga`;
-      renderTally(result.total);
+      serverTotal = result.total;
+      unconfirmed = 0;
+      myHoistNumber = shown(result.total);
+      el.certSeal.textContent = sealText();
+      paintTally();
     }
-    loadWall();
+    loadNames();
   });
 
   /* -------------------------------------------------------------- actions */
@@ -554,7 +669,7 @@
     try {
       await navigator.share({
         title: 'Hoist the Tiranga',
-        text: `I just hoisted the Tiranga 🇮🇳 — ${signed.name}. ${yearsFree} years of freedom. Jai Hind!`,
+        text: shareLine(signed.name),
         url: signed.shareUrl,
       });
     } catch { /* the user dismissed the sheet */ }
@@ -572,7 +687,7 @@
   });
 
   el.save.addEventListener('click', async () => {
-    if (!signed) return;
+    if (!signed?.name) return;
     const label = el.save.querySelector('span');
     const original = label.textContent;
     label.textContent = 'Drawing…';
@@ -582,8 +697,8 @@
       const canvas = await window.Certificate.render({
         name: signed.name,
         meta: el.certMeta.textContent,
-        seal: signed.hoistNumber
-          ? `Hoist #${signed.hoistNumber.toLocaleString('en-IN')}`
+        seal: myHoistNumber
+          ? `Hoist #${myHoistNumber.toLocaleString('en-IN')}`
           : 'Har Ghar Tiranga',
         url: siteBase().replace(/^https?:\/\//, ''),
       });
@@ -629,6 +744,16 @@
 
   let tallyJob = null;
 
+  /* Two numbers, because they arrive at different times and from different
+     places: what the server last told us, and what this browser has done since
+     that the server has not confirmed yet. Keeping them apart is what stops a
+     slow first count() — six seconds on a cold mobile connection — from landing
+     after a hoist and walking the displayed number back down by one. */
+  let serverTotal = null;
+  let unconfirmed = 0;
+
+  const paintTally = () => renderTally((serverTotal || 0) + unconfirmed);
+
   /* Counting up reads as a live number rather than a static one. Short enough
      not to delay anything, and it settles on the exact figure. */
   function renderTally(real) {
@@ -654,22 +779,82 @@
     window.Ticker.add(tallyJob);
   }
 
-  async function loadWall() {
-    const names = await window.HoistStore.recent(8);
+  /**
+   * Count this hoist. The optimistic bump is the point: the write can be slow,
+   * throttled or blocked, and the number has to move while the flag is still on
+   * its way up, or pressing the button appears to do nothing.
+   */
+  async function countThisHoist() {
+    unconfirmed += 1;
+    paintTally();
+
+    const result = await window.HoistStore.hoist();
+    if (typeof result.total === 'number') {
+      /* The server's total now includes this hoist, so the local bump is spent.
+         If the write failed the bump stays put: they did hoist the flag, and a
+         number that jumps back down is worse than one that is one ahead. */
+      serverTotal = result.total;
+      unconfirmed = 0;
+      myHoistNumber = shown(result.total);
+      paintTally();
+      if (signed?.name) el.certSeal.textContent = sealText();
+    }
+    loadNames();
+  }
+
+  /* ------------------------------------------------------- the wall of names */
+
+  /* How long one name takes to travel the full height of the column, and how
+     many ride it at once. Slow and few: this sits behind the ceremony and must
+     never pull the eye off the flag. */
+  const ROLL_MS = 19000;
+  const ROLL_MAX = 10;
+
+  /**
+   * The names, in two places at once: drifting up the sky for whoever is
+   * watching, and as a plain line of text in the share card for whoever is
+   * reading with a screen reader or has motion turned off.
+   */
+  function renderNames(names) {
     if (!names.length) return;
+
     el.wall.hidden = false;
     el.wall.innerHTML = '';
     const b = document.createElement('b');
-    b.textContent = names.join(' · ');
-    el.wall.append(document.createTextNode('Hoisted just now by '), b);
+    b.textContent = names.slice(0, 8).join(' · ');
+    el.wall.append(document.createTextNode('Hoisted here by '), b);
+
+    const riders = names.slice(0, ROLL_MAX);
+    el.roll.style.setProperty('--roll-ms', `${ROLL_MS}ms`);
+    el.rollTrack.innerHTML = '';
+    riders.forEach((name, i) => {
+      const span = document.createElement('span');
+      span.className = 'roll__name';
+      span.textContent = name;
+      /* Spread over the loop with negative delays, so the column is already
+         full of names on the first frame instead of filling up over 19s. */
+      span.style.animationDelay = `${-((i / riders.length) * ROLL_MS).toFixed(0)}ms`;
+      el.rollTrack.appendChild(span);
+    });
+    el.roll.hidden = false;
   }
 
+  async function loadNames() {
+    renderNames(await window.HoistStore.recent(ROLL_MAX));
+  }
+
+  /* Straight away, with the seed, rather than after the first round trip — that
+     took six seconds on a cold connection here, and the badge popping into the
+     corner of a scene somebody is already watching is worse than a number that
+     corrects itself a moment later. */
+  paintTally();
+
   if (window.HoistStore.remote) {
-    window.HoistStore.count().then(renderTally);
-  } else {
-    /* No shared counter configured: still show the seed rather than nothing, so
-       the badge does not simply vanish. */
-    renderTally(0);
+    window.HoistStore.count().then((total) => {
+      if (typeof total === 'number') serverTotal = total;
+      paintTally();
+    });
+    loadNames();
   }
 
   /* ═══════════════════════════════════════════════ arriving from a shared link */
@@ -716,6 +901,7 @@
 
   if (reduced.matches) flags.uk.setMode('still');
 
+  setStep(1);
   layout();
   snapCarriage(0);
   flags.in.reveal = 0;
@@ -734,4 +920,8 @@
   /* Fonts landing late can reflow the console and change the stage height, so
      re-measure once they do. */
   document.fonts?.ready.then(layout);
+
+  /* The walkthrough starts on the first control. Deferred a beat so the card's
+     entrance animation has settled and the bubble does not chase it. */
+  setTimeout(COACH.hoist, 620);
 })();

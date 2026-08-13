@@ -2,13 +2,20 @@ rules_version = '2';
 
 // Deploy with:  firebase deploy --only firestore:rules
 //
-// Anyone may read the wall of names and write exactly one hoist record. Nothing
-// can ever be edited or deleted, and the shape of a record is pinned down here
-// rather than trusted from the browser.
+// Anyone may read the wall of names and write hoist records. The shape of a
+// record is pinned down here rather than trusted from the browser.
 //
-// This is open by design — there is no sign-in. If the app gets scraped or
-// spammed, turn on Firebase App Check (see README) which blocks writes that do
-// not come from your own page.
+// A record is written the moment the flag is hoisted, with an empty name — that
+// is what makes the counter count everybody who hoists rather than only the few
+// who sign. Signing afterwards fills the name in, so the one update allowed
+// here is: an empty name becoming a real one, once. Nothing else can ever be
+// edited, and nothing can be deleted.
+//
+// This is open by design — there is no sign-in. It does mean a passer-by could
+// put a name on somebody else's unsigned hoist; the blast radius is one wrong
+// name on a wall of first names. If the app gets scraped or spammed, turn on
+// Firebase App Check (see README) which blocks writes that do not come from
+// your own page.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,13 +26,21 @@ service cloud.firestore {
       allow create: if
         request.resource.data.keys().hasOnly(['name', 'at', 'day'])
         && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 28
         && request.resource.data.at is timestamp
         && request.resource.data.day is string
         && request.resource.data.day.size() == 10;
 
-      allow update, delete: if false;
+      // Signing a hoist that has not been signed yet: the name field only, and
+      // only while it is still empty.
+      allow update: if
+        resource.data.name == ''
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 28;
+
+      allow delete: if false;
     }
 
     // Nothing else in the database is reachable from the browser.
