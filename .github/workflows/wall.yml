@@ -1,0 +1,51 @@
+name: Refresh the wall
+
+# Snapshots the hoist count and the recent names into wall.json, which the app
+# reads instead of querying Firestore from every visitor's browser. See
+# tools/build-wall.mjs for why: a count() aggregation is billed per thousand
+# documents, so read cost grew with the collection and the free daily allowance
+# ran out after a couple of hundred visitors.
+#
+# The script leaves the file untouched when the numbers have not moved, so this
+# only commits — and only triggers a deploy — when there is something new to say.
+
+on:
+  schedule:
+    # Every ten minutes. GitHub runs scheduled jobs late under load, sometimes by
+    # several minutes; the app never depends on this being punctual.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+# Never let two refreshes race for the same commit.
+concurrency:
+  group: wall
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No dependencies to install: the script uses built-in fetch.
+      - name: Snapshot the count and the names
+        run: node tools/build-wall.mjs
+
+      - name: Commit if anything changed
+        run: |
+          if git diff --quiet -- wall.json; then
+            echo "No change to publish."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wall.json
+          git commit -m "Refresh the wall: $(node -e "const w=require('./wall.json');console.log(w.count+' hoists, '+w.names.length+' names')")"
+          git push

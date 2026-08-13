@@ -99,6 +99,34 @@ window.HoistStore = (() => {
      *  true for one browser. */
     remote: REMOTE,
 
+    /**
+     * The count and the wall as of the last CI snapshot — one static file from
+     * the CDN, and no Firestore reads at all.
+     *
+     * This is the normal path. Reading Firestore from every browser cost about
+     * 34 reads a visitor, and far more as the collection grew, because a count()
+     * aggregation is billed per thousand documents matched: at a hundred
+     * thousand records it was 232 a visitor and the free daily allowance was
+     * gone after two hundred people. A snapshot costs one cached GET.
+     *
+     * @returns {Promise<{count:number, names:string[], at:string}|null>}
+     */
+    async snapshot() {
+      try {
+        const res = await fetch('wall.json', { signal: AbortSignal.timeout(5000) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (typeof data?.count !== 'number') return null;
+        return {
+          count: data.count,
+          names: Array.isArray(data.names) ? data.names.filter((n) => typeof n === 'string' && n.trim()) : [],
+          at: typeof data.at === 'string' ? data.at : '',
+        };
+      } catch {
+        return null;
+      }
+    },
+
     /** Total hoists ever, or null if it cannot be determined. */
     async count() {
       if (!REMOTE) return null;
@@ -170,7 +198,11 @@ window.HoistStore = (() => {
         const doc = await post(`/${COLL}`, fields(''));
         ls.set(LS_LAST_WRITE, Date.now());
         pending = doc?.name || null;
-        return { ok: true, total: await this.count() };
+        /* No count() afterwards. It was an extra aggregation read per hoist, and
+           the caller already knows to add one locally — which is both cheaper and
+           more responsive than waiting for a round trip to tell it what it just
+           did. */
+        return { ok: true, total: null };
       } catch {
         return { ok: false, total: null };
       }
@@ -202,7 +234,11 @@ window.HoistStore = (() => {
       try {
         await post(`/${COLL}`, fields(clean));
         ls.set(LS_LAST_WRITE, Date.now());
-        return { ok: true, total: await this.count(), fresh: true };
+        /* This path wrote a second record, so the true total is one higher than
+           the caller thinks. It corrects itself at the next CI snapshot, which is
+           the right trade for not spending an aggregation read on every
+           signature. */
+        return { ok: true, total: null, fresh: true };
       } catch {
         return { ok: false, total: null };
       }

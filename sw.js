@@ -19,7 +19,7 @@
    Bump VERSION on deploy; activate then drops every older cache outright.
    ========================================================================== */
 
-const VERSION = 'tiranga-v10';
+const VERSION = 'tiranga-v11';
 const NETWORK_TIMEOUT = 1800;
 
 /* Relative so this works both at a domain root and under a GitHub Pages
@@ -130,7 +130,10 @@ async function networkFirst(request) {
   }
 }
 
-const CODE = /\.(?:js|css|webmanifest)$/;
+/* Network-first, so a fix reaches people who already opened the page — and so
+   wall.json, which is the live count and the wall of names, is never served from
+   cache while the network is available. Offline, both fall back to the cache. */
+const FRESH = /(?:\.(?:js|css|webmanifest)|wall\.json)$/;
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -145,6 +148,6 @@ self.addEventListener('fetch', (event) => {
      be actively wrong. */
   if (!sameOrigin && !isFont) return;
 
-  const fresh = request.mode === 'navigate' || (sameOrigin && CODE.test(url.pathname));
+  const fresh = request.mode === 'navigate' || (sameOrigin && FRESH.test(url.pathname));
   event.respondWith(fresh ? networkFirst(request) : staleWhileRevalidate(request));
 });

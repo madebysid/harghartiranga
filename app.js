@@ -653,6 +653,10 @@
     el.nameHint.textContent = 'Signed. Your name is on the certificate below.';
 
     prepareShare(name);
+    /* Before the write, not after it. The round trip can take seconds on mobile
+       data, and their name belongs in the sky the instant they sign — the same
+       reason the tally bumps optimistically. */
+    addNameLocally(name);
     setStep(3);
     say(`Signed by ${name}. Share it, or save the image.`);
     buzz(25);
@@ -666,15 +670,7 @@
        already counted at the press, so this normally only attaches the name —
        it reports a total only when it had to fall back to writing a fresh
        record, and then that total is the one to trust. */
-    const result = await window.HoistStore.sign(name);
-    if (typeof result.total === 'number') {
-      serverTotal = result.total;
-      unconfirmed = 0;
-      myHoistNumber = shown(result.total);
-      el.certSeal.textContent = sealText();
-      paintTally();
-    }
-    loadNames();
+    await window.HoistStore.sign(name);
   });
 
   /* -------------------------------------------------------------- actions */
@@ -805,17 +801,14 @@
     unconfirmed += 1;
     paintTally();
 
-    const result = await window.HoistStore.hoist();
-    if (typeof result.total === 'number') {
-      /* The server's total now includes this hoist, so the local bump is spent.
-         If the write failed the bump stays put: they did hoist the flag, and a
-         number that jumps back down is worse than one that is one ahead. */
-      serverTotal = result.total;
-      unconfirmed = 0;
-      myHoistNumber = shown(result.total);
-      paintTally();
-      if (signed?.name) el.certSeal.textContent = sealText();
-    }
+    /* Their place in the tally, from the snapshot plus what this browser has
+       done since. Approximate by however many hoists have happened elsewhere
+       since the last snapshot — which is the honest cost of not charging every
+       visitor an aggregation read, and invisible next to a seeded counter. */
+    myHoistNumber = shown((serverTotal || 0) + unconfirmed);
+    if (signed?.name) el.certSeal.textContent = sealText();
+
+    await window.HoistStore.hoist();
     /* No loadNames() here on purpose. A hoist carries no name, so the wall
        cannot have changed because of it, and re-reading it was costing every
        visitor a third query for nothing. */
@@ -862,6 +855,15 @@
     renderNames(await window.HoistStore.recent(ROLL_MAX));
   }
 
+  /* Their own name, straight into the sky. The snapshot that everyone else's
+     name arrives in is minutes old, and waiting for the next one to see yourself
+     would make signing feel like it had not worked. */
+  function addNameLocally(name) {
+    const known = [...el.rollTrack.children].map((n) => n.textContent);
+    if (known.some((n) => n.toLocaleLowerCase() === name.toLocaleLowerCase())) return;
+    renderNames([name, ...known].slice(0, ROLL_MAX));
+  }
+
   /* Straight away, with the seed, rather than after the first round trip — that
      took six seconds on a cold connection here, and the badge popping into the
      corner of a scene somebody is already watching is worse than a number that
@@ -869,11 +871,22 @@
   paintTally();
 
   if (window.HoistStore.remote) {
-    window.HoistStore.count().then((total) => {
+    (async () => {
+      /* The snapshot first: one cached file, no Firestore reads. Falling back to
+         querying Firestore directly only matters before CI has ever written
+         wall.json, or if it is unreachable. */
+      const snap = await window.HoistStore.snapshot();
+      if (snap) {
+        serverTotal = snap.count;
+        paintTally();
+        renderNames(snap.names);
+        return;
+      }
+      const total = await window.HoistStore.count();
       if (typeof total === 'number') serverTotal = total;
       paintTally();
-    });
-    loadNames();
+      loadNames();
+    })();
   }
 
   /* ═══════════════════════════════════════════════ arriving from a shared link */
