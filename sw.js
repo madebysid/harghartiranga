@@ -19,7 +19,7 @@
    Bump VERSION on deploy; activate then drops every older cache outright.
    ========================================================================== */
 
-const VERSION = 'tiranga-v9';
+const VERSION = 'tiranga-v10';
 const NETWORK_TIMEOUT = 1800;
 
 /* Relative so this works both at a domain root and under a GitHub Pages
@@ -32,6 +32,11 @@ const PRECACHE = [
   'ticker.js',
   'cloth.js',
   'celebrate.js',
+  /* app.js constructs an Anthem at start-up, so without this the whole app dies
+     on the first offline open rather than merely losing its sound. It was absent
+     because the first page load fetches it before the worker is controlling, so
+     it only ever reached the cache on a second visit. */
+  'anthem.js',
   'store.js',
   'certificate.js',
   'coach.js',
@@ -42,10 +47,21 @@ const PRECACHE = [
   'flags/union-jack.svg',
   'fort-wall.svg',
   'fort-gate.svg',
-  'og.png',
+  /* Deliberately not precached, though all of it is still cached on demand once
+     something asks for it:
+
+       og.png                 44KB, and the page never displays it — it exists for
+                              WhatsApp and Twitter's crawlers, which do not run
+                              service workers. Precaching it spent 44KB of every
+                              visitor's data on an image none of them would see.
+       icon-512, maskable     15KB between them, wanted only at install time.
+       anthem-hoist.mp3       166KB, fetched on the first hoist. Someone who
+                              opens the page and leaves should not pay for audio
+                              they never heard.
+
+     What is left below is the app itself, which is what "works with no
+     connection" has to mean. */
   'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png',
 ];
 

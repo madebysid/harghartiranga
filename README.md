@@ -200,7 +200,40 @@ appears in the page once the browser offers the install prompt; on iOS it is
 Share → Add to Home Screen. Installed, it opens without browser chrome, keeps its
 own icon, and respects the notch and home indicator via `env(safe-area-inset-*)`.
 
-**It works with no connection.** The service worker precaches all 22 files, so
+## What it costs to serve
+
+Measured, gzipped, per visitor:
+
+| | Bytes |
+|---|---|
+| App shell — markup, styles, all ten scripts, the SVGs | 52 KB |
+| Icons the worker precaches | 6 KB |
+| `anthem-hoist.mp3`, on the first hoist | 162 KB |
+| **A visitor who hoists** | **222 KB** |
+| A visitor who opens the page and leaves | 59 KB |
+| `anthem-full.mp3`, only if the button is pressed | 724 KB |
+
+It was 1,526 KB a head until the anthem was split: the ceremony plays the closing
+fourteen seconds, but `unlock()` has to call `load()` inside the click for mobile
+autoplay, and `load()` starts at byte zero — so all 62 seconds came down to play
+14. Everyone paid 1.4MB for audio most of them never chose.
+
+That number sets the ceiling, because Firebase Hosting's free tier is **360MB a
+day**:
+
+| | Free-tier ceiling |
+|---|---|
+| Everyone hoists | ~1,660 a day (was ~235) |
+| Firestore reads, ~34 per visitor | ~1,400 a day |
+| Firestore writes, 2 per visitor | ~10,000 a day |
+
+Past that, hosting on the free tier stops serving until the next day. For tens of
+thousands, move the static files to a host with real free bandwidth — Cloudflare
+Pages is unmetered, GitHub Pages allows 100GB a month — and serve the count and
+the wall as a periodically regenerated JSON file so a visitor's page load costs
+no Firestore reads at all. 100,000 hoists is about 21GB.
+
+**It works with no connection.** The service worker precaches the app, so
 once the page has been opened a single time it opens again on a dead network —
 the hoisting, the certificate and the saved image need nothing from a server.
 Only the shared counter does.

@@ -155,10 +155,13 @@
   };
   const party = new window.Celebration(el.confetti);
 
-  /* 48s in is the closing "Jaya he" passage — the last 14 seconds of the
-     recording — which is what plays as the flag unfurls. The button plays the
-     whole thing from the top. */
-  const anthem = new window.Anthem({ src: 'anthem.mp3', hoistAt: 48 });
+  /* Two files: the closing "Jaya he" passage plays as the flag unfurls, and the
+     whole recording is fetched only if the button is pressed. See anthem.js for
+     why that split is worth the second file. */
+  const anthem = new window.Anthem({
+    hoistSrc: 'anthem-hoist.mp3',
+    fullSrc: 'anthem-full.mp3',
+  });
 
   let onPole = flags.uk;
   const drawCloth = (t) => onPole && onPole.draw(t);
